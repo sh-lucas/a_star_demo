@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor de Mapa A*</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1a1a2e; overflow: hidden; font-family: monospace; }
+
+    #canvas {
+      display: block;
+      cursor: crosshair;
+    }
+
+    #panel {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 180px;
+      z-index: 10;
+    }
+
+    .mode-btn {
+      padding: 8px 10px;
+      background: #16213e;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      font-size: 13px;
+    }
+    .mode-btn.active {
+      background: #0f3460;
+      color: #fff;
+      border-color: #e94560;
+    }
+    .mode-btn:hover { border-color: #e94560; }
+
+    .io-row {
+      display: flex;
+      gap: 6px;
+    }
+    .io-btn {
+      flex: 1;
+      padding: 6px 4px;
+      background: #16213e;
+      color: #aaa;
+      border: 1px solid #333;
+      border-radius: 4px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      text-align: center;
+    }
+    .io-btn:hover { border-color: #e94560; color: #fff; }
+
+    .list-section {
+      margin-top: 4px;
+      background: #16213e;
+      border: 1px solid #333;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .list-title {
+      padding: 5px 8px;
+      font-size: 11px;
+      color: #888;
+      border-bottom: 1px solid #333;
+      text-transform: uppercase;
+    }
+    .list-item {
+      padding: 5px 8px;
+      font-size: 12px;
+      color: #aaa;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .list-item:hover { background: #0f3460; color: #e94560; }
+    .list-empty {
+      padding: 5px 8px;
+      font-size: 11px;
+      color: #555;
+      font-style: italic;
+    }
+
+    #status {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      color: #888;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    #hint-pan {
+      position: fixed;
+      bottom: 30px;
+      left: 12px;
+      color: #555;
+      font-family: monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="panel">
+    <button class="mode-btn active" id="btn-move" onclick="window.setMode('move')">🖐️ Mover Mapa</button>
+    <button class="mode-btn" id="btn-point" onclick="window.setMode('point')">➕ Adicionar Ponto</button>
+    <button class="mode-btn" id="btn-edge" onclick="window.setMode('edge')">🔗 Adicionar Aresta</button>
+    <button class="mode-btn" id="btn-path" onclick="window.setMode('path')">🔍 Achar Caminho</button>
+
+    <div class="io-row">
+      <button class="io-btn" onclick="window.exportJSON()">⬇ Export</button>
+      <button class="io-btn" onclick="window.importJSON()">⬆ Import</button>
+    </div>
+
+    <div class="list-section">
+      <div class="list-title">Pontos</div>
+      <div id="point-list"></div>
+    </div>
+
+    <div class="list-section">
+      <div class="list-title">Arestas</div>
+      <div id="edge-list"></div>
+    </div>
+  </div>
+
+  <div id="hint-pan">Segurar Espaço + arrastar para mover o mapa</div>
+  <div id="status">Modo: Mover Mapa (🖐️)</div>
+
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
