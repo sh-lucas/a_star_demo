@@ -10,6 +10,16 @@ export const mapState = {
     image: null,    // HTMLImageElement
     offsetX: 0,
     offsetY: 0
+  },
+  // Visual/Transient state (not exported)
+  visual: {
+    hoveredPointId: null,
+    hoveredEdgeId: null,
+    editSelectedIdx: null,
+    selected: [] // pending indices para edge/path
+  },
+  session: {
+    pathResult: [] // índices ordenados do caminho A*
   }
 };
 
