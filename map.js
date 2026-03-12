@@ -40,7 +40,10 @@ export function resetMapState() {
 export function exportJSON() {
   const data = JSON.stringify(
     {
-      points: mapState.points,
+      points: mapState.points.map(p => ({
+        ...p,
+        type: p.type || 'path'
+      })),
       edges: mapState.edges,
       nextPId: mapState.nextPId,
       nextEId: mapState.nextEId,

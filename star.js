@@ -1,4 +1,3 @@
-
 // ---- A* ----
 function dist(points, a, b) {
   return Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);
@@ -16,7 +15,7 @@ function buildAdj(points, edges) {
 
 export function runAStar(points, edges, start, goal) {
   if (start === goal) return [start];
-  
+
   const adj = buildAdj(points, edges);
   const n = points.length;
   const g = new Array(n).fill(Infinity);
