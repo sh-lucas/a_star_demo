@@ -11,6 +11,29 @@
     #canvas {
       display: block;
       cursor: crosshair;
+      background: transparent;
+      position: relative;
+      z-index: 1;
+    }
+
+    #bg-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+      opacity: 0.75;
+    }
+
+    #bg-layer svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: block;
     }
 
     #panel {
@@ -20,7 +43,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      width: 180px;
+      width: 220px;
       z-index: 10;
     }
 
@@ -108,20 +131,138 @@
       font-family: monospace;
       font-size: 11px;
     }
+
+    #zoom-panel {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background: #16213e;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 10;
+    }
+    #zoom-panel label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+    }
+    #zoom-panel input[type=range] {
+      width: 100px;
+      accent-color: #e94560;
+    }
+    #zoom-panel span {
+      font-size: 12px;
+      color: #ccc;
+      width: 40px;
+      text-align: right;
+    }
+
+    /* Background controls */
+    #bg-btn {
+      padding: 8px 10px;
+      background: #1a2a1a;
+      color: #8bc68a;
+      border: 1px solid #3a5a3a;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      font-size: 13px;
+      width: 100%;
+    }
+    #bg-btn:hover { border-color: #5acd5a; }
+    #bg-btn.has-bg { background: #1f3a1f; color: #aef4ae; border-color: #5acd5a; }
+
+    #bg-panel {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      background: #16213e;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 8px;
+    }
+    #bg-panel.open { display: flex; }
+
+    .bg-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .bg-row label {
+      font-size: 11px;
+      color: #888;
+      width: 50px;
+      flex-shrink: 0;
+    }
+    .bg-row input[type=number] {
+      flex: 1;
+      background: #0f172a;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 4px;
+      font: inherit;
+      font-size: 12px;
+    }
+    .bg-row input[type=number]:focus { border-color: #e94560; outline: none; }
+    #bg-clear {
+      padding: 4px 6px;
+      background: #3a1a1a;
+      color: #e94560;
+      border: 1px solid #5a2a2a;
+      border-radius: 4px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+    }
+    #bg-clear:hover { border-color: #e94560; }
   </style>
 </head>
 <body>
+  <div id="bg-layer"></div>
   <canvas id="canvas"></canvas>
+
+  <div id="zoom-panel">
+    <label>Zoom</label>
+    <input id="map-zoom" type="range" min="0.05" max="10" step="0.01" value="1"
+           oninput="window.updateMapZoom(this.value)">
+    <span id="map-zoom-val">1.00×</span>
+  </div>
 
   <div id="panel">
     <button class="mode-btn active" id="btn-move" onclick="window.setMode('move')">🖐️ Mover Mapa</button>
     <button class="mode-btn" id="btn-point" onclick="window.setMode('point')">➕ Adicionar Ponto</button>
     <button class="mode-btn" id="btn-edge" onclick="window.setMode('edge')">🔗 Adicionar Aresta</button>
+    <button class="mode-btn" id="btn-edit" onclick="window.setMode('edit')">✏️ Editar Ponto</button>
     <button class="mode-btn" id="btn-path" onclick="window.setMode('path')">🔍 Achar Caminho</button>
 
     <div class="io-row">
       <button class="io-btn" onclick="window.exportJSON()">⬇ Export</button>
       <button class="io-btn" onclick="window.importJSON()">⬆ Import</button>
+    </div>
+
+    <!-- Background SVG upload + controls -->
+    <button id="bg-btn" onclick="window.toggleBgPanel()">🖼️ Background SVG</button>
+    <div id="bg-panel">
+      <div class="bg-row">
+        <label>Offset X</label>
+        <input id="bg-ox" type="number" step="1" value="0"
+               oninput="window.updateBgParam('ox', this.value)">
+      </div>
+      <div class="bg-row">
+        <label>Offset Y</label>
+        <input id="bg-oy" type="number" step="1" value="0"
+               oninput="window.updateBgParam('oy', this.value)">
+      </div>
+      <div class="bg-row" style="justify-content:space-between">
+        <button id="bg-clear" onclick="window.clearBackground()">✕ Remover</button>
+        <button class="io-btn" style="flex:unset;padding:4px 8px;font-size:11px" onclick="window.uploadBackground()">📁 Escolher SVG</button>
+      </div>
     </div>
 
     <div class="list-section">
