@@ -28,6 +28,8 @@ function updateCursor() {
 handleResize(canvas, draw);
 
 window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
   if (e.code === 'Space' && !e.repeat) {
     spaceDown = true;
     updateCursor();
@@ -51,6 +53,8 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('keyup', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
   if (e.code === 'Space') {
     spaceDown = false; panning = false; panStart = null;
     updateCursor();
