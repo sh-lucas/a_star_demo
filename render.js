@@ -83,8 +83,8 @@ export function draw() {
     ctx.lineWidth = (isHovered || isEditing) ? 2 : 1;
     ctx.stroke();
 
-    // Label: icone (se tiver) + ID
-    const label = p.icon ? `${p.icon} P${p.id}` : `P${p.id}`;
+    // Label: apenas ID (removido ícone a pedido do usuário)
+    const label = `P${p.id}`;
     ctx.fillStyle = (isHovered || isEditing) ? '#ffcc00' : '#ddd';
     ctx.font = (isHovered || isEditing) ? 'bold 12px monospace' : '11px monospace';
     ctx.fillText(label, p.x + 12, p.y - 8);
