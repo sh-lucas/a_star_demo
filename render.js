@@ -68,18 +68,26 @@ export function draw() {
     const isPath = pathSet.has(i);
     const isHovered = p.id === mapState.visual.hoveredPointId;
 
+    // Cor base por tipo
+    const type = p.type || 'path';
+    const typeColor = type === 'start' ? '#66bb6a' : type === 'destination' ? '#e94560' : '#4fc3f7';
+
     ctx.beginPath();
     ctx.arc(p.x, p.y, (isHovered || isEditing) ? 10 : (isSelected ? 8 : 6), 0, Math.PI * 2);
 
-    ctx.fillStyle = isEditing ? '#e94560' : (isHovered ? '#ffcc00' : (isSelected ? '#f0a500' : (isPath ? '#e94560' : '#4fc3f7')));
+    ctx.fillStyle = isEditing
+      ? typeColor
+      : (isHovered ? '#ffcc00' : (isSelected ? '#f0a500' : (isPath ? '#e94560' : typeColor)));
     ctx.fill();
     ctx.strokeStyle = (isHovered || isEditing) ? '#fff' : '#222';
     ctx.lineWidth = (isHovered || isEditing) ? 2 : 1;
     ctx.stroke();
 
+    // Label: icone (se tiver) + ID
+    const label = p.icon ? `${p.icon} P${p.id}` : `P${p.id}`;
     ctx.fillStyle = (isHovered || isEditing) ? '#ffcc00' : '#ddd';
     ctx.font = (isHovered || isEditing) ? 'bold 12px monospace' : '11px monospace';
-    ctx.fillText(`P${p.id}`, p.x + 12, p.y - 8);
+    ctx.fillText(label, p.x + 12, p.y - 8);
   }
 
   finishCanvas(ctx);
@@ -91,14 +99,17 @@ export function renderLists() {
   if (!pl || !el) return;
 
   pl.innerHTML = mapState.points.length
-    ? mapState.points.map(p =>
-      `<div class="list-item" 
-            onclick="window.removePoint(${p.id})" 
-            onmouseenter="window.setHoveredPoint(${p.id})" 
-            onmouseleave="window.setHoveredPoint(null)"
-            title="Clique para remover">
-          P${p.id} (${Math.round(p.x)}, ${Math.round(p.y)})
-        </div>`).join('')
+    ? mapState.points.map(p => {
+        const type = p.type || 'path';
+        const dot = `<span class="type-dot ${type}"></span>`;
+        return `<div class="list-item" 
+              onclick="window.removePoint(${p.id})" 
+              onmouseenter="window.setHoveredPoint(${p.id})" 
+              onmouseleave="window.setHoveredPoint(null)"
+              title="Clique para remover">
+            ${dot}P${p.id} (${Math.round(p.x)}, ${Math.round(p.y)})
+          </div>`;
+      }).join('')
     : '<div class="list-empty">nenhum</div>';
 
   el.innerHTML = mapState.edges.length
@@ -137,4 +148,41 @@ export function syncBgUI() {
   const oyInput = document.getElementById('bg-oy');
   if (oxInput) oxInput.value = Math.round(mapState.background.offsetX);
   if (oyInput) oyInput.value = Math.round(mapState.background.offsetY);
+}
+
+/** Mostra/atualiza/oculta o painel de detalhes do ponto selecionado */
+export function syncPointDetailPanel(idx) {
+  const panel = document.getElementById('point-detail');
+  if (!panel) return;
+
+  if (idx === null || idx === undefined || !mapState.points[idx]) {
+    panel.classList.remove('visible');
+    return;
+  }
+
+  panel.classList.add('visible');
+  const p = mapState.points[idx];
+  const type = p.type || 'path';
+
+  // Atualiza o header
+  const idEl = document.getElementById('pd-point-id');
+  if (idEl) idEl.textContent = `P${p.id}`;
+
+  // Atualiza o seletor de tipo
+  const typeSelect = document.getElementById('pd-type');
+  if (typeSelect) typeSelect.value = type;
+
+  // Mostra/esconde campos de metadados
+  const meta = document.getElementById('pd-meta');
+  const hasMeta = type === 'start' || type === 'destination';
+  if (meta) meta.classList.toggle('visible', hasMeta);
+
+  if (hasMeta) {
+    const title = document.getElementById('pd-title');
+    const desc = document.getElementById('pd-desc');
+    const icon = document.getElementById('pd-icon');
+    if (title) title.value = p.title || '';
+    if (desc) desc.value = p.description || '';
+    if (icon) icon.value = p.icon || '';
+  }
 }

@@ -12,8 +12,13 @@
       display: block;
       cursor: crosshair;
       background: transparent;
-      position: relative;
-      z-index: 1;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 5;
+      pointer-events: auto;
     }
 
     #bg-layer {
@@ -22,11 +27,15 @@
       left: 0;
       width: 0;
       height: 0;
-      pointer-events: none;
+      pointer-events: none !important;
       z-index: 0;
       transform-origin: 0 0;
       will-change: transform;
       opacity: 0.75;
+    }
+
+    #bg-layer * {
+      pointer-events: none !important;
     }
 
     #bg-layer svg {
@@ -115,22 +124,7 @@
       font-style: italic;
     }
 
-    #status {
-      position: fixed;
-      bottom: 12px;
-      left: 12px;
-      color: #888;
-      font-family: monospace;
-      font-size: 13px;
-    }
-    #hint-pan {
-      position: fixed;
-      bottom: 30px;
-      left: 12px;
-      color: #555;
-      font-family: monospace;
-      font-size: 11px;
-    }
+
 
     #zoom-panel {
       position: fixed;
@@ -221,6 +215,73 @@
       font-size: 11px;
     }
     #bg-clear:hover { border-color: #e94560; }
+
+    /* ---- Point Detail Panel ---- */
+    #point-detail {
+      display: none;
+      position: fixed;
+      bottom: 48px;
+      left: 12px;
+      width: 260px;
+      background: #16213e;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 10px;
+      z-index: 10;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #point-detail.visible { display: flex; }
+    #point-detail .pd-title {
+      font-size: 11px;
+      color: #888;
+      /*text-transform: uppercase;*/
+      border-bottom: 1px solid #333;
+      padding-bottom: 6px;
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #point-detail .pd-title span { color: #aaa; font-size: 12px; text-transform: none; }
+    #point-detail .pd-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #point-detail .pd-row label {
+      font-size: 11px;
+      color: #888;
+      width: 70px;
+      /*flex-shrink: 0;*/
+    }
+    #point-detail select,
+    #point-detail input[type=text],
+    #point-detail textarea {
+      flex: 1;
+      background: #0f172a;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font: inherit;
+      font-size: 12px;
+    }
+    #point-detail select:focus,
+    #point-detail input[type=text]:focus,
+    #point-detail textarea:focus { border-color: #e94560; outline: none; }
+    #point-detail textarea { resize: vertical; min-height: 48px; }
+    #point-detail .pd-meta { display: none; flex-direction: column; gap: 8px; }
+    #point-detail .pd-meta.visible { display: flex; }
+    .type-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    .type-dot.path { background: #4fc3f7; }
+    .type-dot.start { background: #66bb6a; }
+    .type-dot.destination { background: #e94560; }
   </style>
 </head>
 <body>
@@ -276,8 +337,37 @@
     </div>
   </div>
 
-  <div id="hint-pan">Segurar Espaço + arrastar para mover o mapa</div>
-  <div id="status">Modo: Mover Mapa (🖐️)</div>
+
+
+  <!-- Point Detail Panel (aparece em modo de edição) -->
+  <div id="point-detail">
+    <div class="pd-title">
+      Ponto
+      <span id="pd-point-id">—</span>
+    </div>
+    <div class="pd-row">
+      <label>Tipo</label>
+      <select id="pd-type" onchange="window.setPointType(this.value)">
+        <option value="path">🔵 Rota (path)</option>
+        <option value="start">🟢 Início (start)</option>
+        <option value="destination">🔴 Destino (destination)</option>
+      </select>
+    </div>
+    <div class="pd-meta" id="pd-meta">
+      <div class="pd-row">
+        <label>Título</label>
+        <input type="text" id="pd-title" placeholder="ex: Sala A" oninput="window.setPointMeta('title', this.value)">
+      </div>
+      <div class="pd-row">
+        <label>Descrição</label>
+        <textarea id="pd-desc" placeholder="ex: Sala de reuniões" oninput="window.setPointMeta('description', this.value)"></textarea>
+      </div>
+      <div class="pd-row">
+        <label>Ícone</label>
+        <input type="text" id="pd-icon" placeholder="ex: 🏠" oninput="window.setPointMeta('icon', this.value)">
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./script.js"></script>
 </body>

@@ -1,7 +1,7 @@
 import { camera, screenToWorld, pan, zoomAt, setZoom, handleResize } from './camera.js';
 import { runAStar } from './star.js';
 import { exportJSON as doExport, importJSON as doImport, mapState } from './map.js';
-import { draw, renderLists, syncBgUI } from './render.js';
+import { draw, renderLists, syncBgUI, syncPointDetailPanel } from './render.js';
 
 const TOOLS = {
   move: { label: 'Mover Mapa (🖐️)', cursor: 'grab', activeCursor: 'grabbing' },
@@ -21,18 +21,17 @@ let panStart = null;
 const canvas = document.getElementById('canvas');
 
 function updateCursor() {
-  const tool = TOOLS[mode];
-  canvas.style.cursor = panning ? tool.activeCursor : tool.cursor;
+  const tool = spaceDown ? TOOLS['move'] : TOOLS[mode];
+  canvas.style.cursor = (panning || spaceDown) ? tool.activeCursor : tool.cursor;
 }
 
 handleResize(canvas, draw);
 
 window.addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.repeat) {
-    if (mode !== 'move') { prevMode = mode; setMode('move'); }
-    e.preventDefault();
     spaceDown = true;
     updateCursor();
+    e.preventDefault();
   }
   if (mode === 'edit' && mapState.visual.editSelectedIdx !== null) {
     const p = mapState.points[mapState.visual.editSelectedIdx];
@@ -43,6 +42,7 @@ window.addEventListener('keydown', e => {
     else if (e.code === 'Delete' || e.code === 'Backspace') {
       removePoint(p.id);
       mapState.visual.editSelectedIdx = null;
+      syncPointDetailPanel(null);
     } else return;
     e.preventDefault();
     renderLists();
@@ -52,7 +52,6 @@ window.addEventListener('keydown', e => {
 
 window.addEventListener('keyup', e => {
   if (e.code === 'Space') {
-    if (mode === 'move') setMode(prevMode);
     spaceDown = false; panning = false; panStart = null;
     updateCursor();
   }
@@ -68,6 +67,7 @@ canvas.addEventListener('mousedown', e => {
     if (idx !== null) {
       draggingPointIdx = idx;
       mapState.visual.editSelectedIdx = idx;
+      syncPointDetailPanel(idx);
       updateCursor();
       draw();
     }
@@ -94,12 +94,17 @@ canvas.addEventListener('mouseup', () => {
 });
 
 canvas.addEventListener('click', e => {
-  if (panning || mode === 'move') return;
+  if (panning || spaceDown || mode === 'move') return;
   const { x, y } = screenToWorld(e.clientX, e.clientY);
   if (mode === 'point') { addPoint(x, y); return; }
 
   const idx = nearestPoint(x, y, 20);
-  if (mode === 'edit') { mapState.visual.editSelectedIdx = idx; draw(); return; }
+  if (mode === 'edit') {
+    mapState.visual.editSelectedIdx = idx;
+    syncPointDetailPanel(idx);
+    draw();
+    return;
+  }
   if (idx === null) return;
 
   mapState.visual.selected.push(idx);
@@ -123,19 +128,21 @@ function setMode(m) {
   if (m !== 'move') prevMode = m;
   mapState.visual.selected = [];
   mapState.session.pathResult = [];
-  if (m !== 'edit') mapState.visual.editSelectedIdx = null;
+  if (m !== 'edit') {
+    mapState.visual.editSelectedIdx = null;
+    syncPointDetailPanel(null);
+  }
 
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('btn-' + m);
   if (btn) btn.classList.add('active');
 
-  document.getElementById('status').textContent = 'Modo: ' + TOOLS[m].label;
   updateCursor();
   draw();
 }
 
 function addPoint(x, y) {
-  mapState.points.push({ id: mapState.nextPId++, x, y });
+  mapState.points.push({ id: mapState.nextPId++, x, y, type: 'path' });
   renderLists();
   draw();
 }
@@ -248,6 +255,23 @@ window.uploadBackground = uploadBackground;
 window.clearBackground = clearBackground;
 window.updateBgParam = updateBgParam;
 window.updateMapZoom = updateMapZoom;
+window.setPointType = (type) => {
+  const idx = mapState.visual.editSelectedIdx;
+  if (idx === null || !mapState.points[idx]) return;
+  const p = mapState.points[idx];
+  p.type = type;
+  // Limpa metadados se voltou para 'path'
+  if (type === 'path') { delete p.title; delete p.description; delete p.icon; }
+  syncPointDetailPanel(idx);
+  renderLists();
+  draw();
+};
+window.setPointMeta = (field, value) => {
+  const idx = mapState.visual.editSelectedIdx;
+  if (idx === null || !mapState.points[idx]) return;
+  mapState.points[idx][field] = value;
+  draw(); // re-renderiza o ícone no canvas
+};
 
 renderLists();
 draw();
