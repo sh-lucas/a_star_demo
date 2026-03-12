@@ -71,7 +71,7 @@ window.addEventListener('keydown', e => {
     spaceDown = true;
     updateCursor();
   }
-  
+
   // Setas para mover ponto (pixel-perfect)
   if (mode === 'edit' && editSelectedIdx !== null) {
     const p = mapState.points[editSelectedIdx];
@@ -271,7 +271,7 @@ function nearestPoint(wx, wy, radius) {
 function syncBGLayer() {
   const layer = document.getElementById('bg-layer');
   if (!layer) return;
-  
+
   const hasBg = !!mapState.background.svgContent;
   if (!hasBg) {
     layer.innerHTML = '';
@@ -292,7 +292,7 @@ function syncBGLayer() {
   const zoom = camera.zoom;
   const tx = camera.x + (mapState.background.offsetX * zoom);
   const ty = camera.y + (mapState.background.offsetY * zoom);
-  
+
   layer.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
 }
 
