@@ -1,120 +1,67 @@
+// map.js — Estado do mapa usando IDs do banco de dados
 import { camera } from './camera.js';
 
 export const mapState = {
-  points: [],       // { id, x, y } — em coordenadas de MUNDO
-  edges: [],        // { id, a, b } — índices em points
-  nextPId: 0,
-  nextEId: 0,
+  // Points keyed by DB id: Map<id, { id, x, y, type, establishment_id, map_icon_svg, floor_id }>
+  points: new Map(),
+  // Edges keyed by DB id: Map<id, { id, from_point_id, to_point_id, group_id }>
+  edges: new Map(),
   background: {
     svgContent: null,
     image: null,    // HTMLImageElement
     offsetX: 0,
     offsetY: 0
   },
-  // Visual/Transient state (not exported)
+  // Visual/Transient state (not persisted)
   visual: {
     hoveredPointId: null,
     hoveredEdgeId: null,
-    editSelectedIdx: null,
-    selected: [] // pending indices para edge/path
+    editSelectedIdx: null,   // array index for editing
+    selected: []             // pending point DB IDs for edge/path
   },
   session: {
-    pathResult: [] // índices ordenados do caminho A*
-  }
+    pathResult: [] // array of point DB IDs forming the A* path
+  },
+  floorId: null,
+  floorName: null
 };
 
 /** Reseta o estado do mapa */
 export function resetMapState() {
-  mapState.points = [];
-  mapState.edges = [];
-  mapState.nextPId = 0;
-  mapState.nextEId = 0;
+  mapState.points.clear();
+  mapState.edges.clear();
   mapState.background.svgContent = null;
   mapState.background.image = null;
   mapState.background.offsetX = 0;
   mapState.background.offsetY = 0;
+  mapState.visual.hoveredPointId = null;
+  mapState.visual.hoveredEdgeId = null;
+  mapState.visual.editSelectedIdx = null;
+  mapState.visual.selected = [];
+  mapState.session.pathResult = [];
+  mapState.floorId = null;
+  mapState.floorName = null;
 }
 
-
-/** Exporta o estado atual para um arquivo JSON */
-export function exportJSON() {
-  const data = JSON.stringify(
-    {
-      points: mapState.points.map(p => ({
-        ...p,
-        type: p.type || 'path'
-      })),
-      edges: mapState.edges,
-      nextPId: mapState.nextPId,
-      nextEId: mapState.nextEId,
-      camera: { x: camera.x, y: camera.y, zoom: camera.zoom },
-      background: mapState.background.svgContent ? {
-        svgContent: mapState.background.svgContent,
-        offsetX: mapState.background.offsetX,
-        offsetY: mapState.background.offsetY
-      } : null
-    },
-    null,
-    2
-  );
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'mapa.json';
-  a.click();
-  URL.revokeObjectURL(url);
+/** Retorna array de pontos (para compatibilidade com código legado) */
+export function getPointsArray() {
+  return Array.from(mapState.points.values());
 }
 
-/** Importa o estado a partir de um arquivo JSON selecionado pelo usuário */
-export function importJSON(onSuccess) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json,application/json';
-  input.onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      try {
-        const data = JSON.parse(ev.target.result);
+/** Retorna array de arestas */
+export function getEdgesArray() {
+  return Array.from(mapState.edges.values());
+}
 
-        // Atualiza o estado
-        mapState.points = data.points ?? [];
-        mapState.edges = data.edges ?? [];
-        mapState.nextPId = data.nextPId ?? (mapState.points.reduce((m, p) => Math.max(m, p.id), -1) + 1);
-        mapState.nextEId = data.nextEId ?? (mapState.edges.reduce((m, e) => Math.max(m, e.id), -1) + 1);
+/** Encontra o índice no array de pontos pelo DB ID */
+export function findPointIndexById(pointId) {
+  const pts = getPointsArray();
+  return pts.findIndex(p => p.id === pointId);
+}
 
-        // Câmera
-        if (data.camera) {
-          camera.x = data.camera.x ?? 0;
-          camera.y = data.camera.y ?? 0;
-          camera.zoom = data.camera.zoom ?? 1;
-        }
-
-        // Background
-        if (data.background?.svgContent) {
-          mapState.background.svgContent = data.background.svgContent;
-          mapState.background.offsetX = data.background.offsetX ?? 0;
-          mapState.background.offsetY = data.background.offsetY ?? 0;
-
-          loadSvgToImage(mapState.background.svgContent, img => {
-            mapState.background.image = img;
-            if (onSuccess) onSuccess();
-          });
-        } else {
-          mapState.background.svgContent = null;
-          mapState.background.image = null;
-          if (onSuccess) onSuccess();
-        }
-      } catch (err) {
-        console.error('Import error:', err);
-        alert('Arquivo JSON inválido.');
-      }
-    };
-    reader.readAsText(file);
-  };
-  input.click();
+/** Encontra ponto pelo DB ID */
+export function getPointById(pointId) {
+  return mapState.points.get(pointId);
 }
 
 /** Helper para carregar string SVG em um HTMLImageElement */
@@ -126,5 +73,54 @@ export function loadSvgToImage(svgString, callback) {
     URL.revokeObjectURL(url);
     callback(img);
   };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    callback(null);
+  };
   img.src = url;
+}
+
+/**
+ * Carrega os dados de um floor via resposta da API e popula o mapState.
+ * Expected floorData: { id, name, background_svg, points: [...], edges: [...] }
+ */
+export function loadFloorData(floorData) {
+  resetMapState();
+  mapState.floorId = floorData.id;
+  mapState.floorName = floorData.name;
+
+  // Points
+  if (floorData.points) {
+    for (const p of floorData.points) {
+      mapState.points.set(p.id, {
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        type: p.type || 'path',
+        establishment_id: p.establishment_id,
+        map_icon_svg: p.map_icon_svg,
+        floor_id: p.floor_id
+      });
+    }
+  }
+
+  // Edges
+  if (floorData.edges) {
+    for (const e of floorData.edges) {
+      mapState.edges.set(e.id, {
+        id: e.id,
+        from_point_id: e.from_point_id,
+        to_point_id: e.to_point_id,
+        group_id: e.group_id
+      });
+    }
+  }
+
+  // Background
+  if (floorData.background_svg) {
+    mapState.background.svgContent = floorData.background_svg;
+    loadSvgToImage(mapState.background.svgContent, img => {
+      mapState.background.image = img;
+    });
+  }
 }

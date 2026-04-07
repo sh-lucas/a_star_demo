@@ -1,7 +1,18 @@
 import { camera, screenToWorld, pan, zoomAt, setZoom, handleResize } from './camera.js';
 import { runAStar } from './star.js';
-import { exportJSON as doExport, importJSON as doImport, mapState } from './map.js';
+import { mapState, getPointsArray, getEdgesArray, findPointIndexById, getPointById, loadFloorData, loadSvgToImage } from './map.js';
 import { draw, renderLists, syncBgUI, syncPointDetailPanel } from './render.js';
+import {
+  setAuthToken,
+  listFloors, getFloor,
+  connect, disconnect, isConnected,
+  wsAddPoint, wsMovePoint, wsUpdatePoint, wsRemovePoint,
+  wsAddEdge, wsRemoveEdge,
+  sendMousePosition,
+  on, off,
+  remoteCursors
+} from './api.js';
+
 
 const TOOLS = {
   move: { label: 'Mover Mapa (🖐️)', cursor: 'grab', activeCursor: 'grabbing' },
@@ -13,10 +24,12 @@ const TOOLS = {
 
 let mode = 'move';
 let prevMode = 'move';
-let draggingPointIdx = null; // Índice do ponto sendo arrastado
+let draggingPointId = null; // DB ID do ponto sendo arrastado
 let spaceDown = false;
 let panning = false;
 let panStart = null;
+let mouseLastWorld = { x: 0, y: 0 };
+let mouseSendTimer = null;
 
 const canvas = document.getElementById('canvas');
 
@@ -27,8 +40,9 @@ function updateCursor() {
 
 handleResize(canvas, draw);
 
+// ─── Keyboard ───
 window.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
   if (e.code === 'Space' && !e.repeat) {
     spaceDown = true;
@@ -36,13 +50,15 @@ window.addEventListener('keydown', e => {
     e.preventDefault();
   }
   if (mode === 'edit' && mapState.visual.editSelectedIdx !== null) {
-    const p = mapState.points[mapState.visual.editSelectedIdx];
-    if (e.code === 'ArrowUp') p.y -= 1;
-    else if (e.code === 'ArrowDown') p.y += 1;
-    else if (e.code === 'ArrowLeft') p.x -= 1;
-    else if (e.code === 'ArrowRight') p.x += 1;
+    const pts = getPointsArray();
+    const p = pts[mapState.visual.editSelectedIdx];
+    if (!p) return;
+    if (e.code === 'ArrowUp') { p.y -= 1; wsMovePoint(p.id, p.x, p.y); }
+    else if (e.code === 'ArrowDown') { p.y += 1; wsMovePoint(p.id, p.x, p.y); }
+    else if (e.code === 'ArrowLeft') { p.x -= 1; wsMovePoint(p.id, p.x, p.y); }
+    else if (e.code === 'ArrowRight') { p.x += 1; wsMovePoint(p.id, p.x, p.y); }
     else if (e.code === 'Delete' || e.code === 'Backspace') {
-      removePoint(p.id);
+      wsRemovePoint(p.id);
       mapState.visual.editSelectedIdx = null;
       syncPointDetailPanel(null);
     } else return;
@@ -54,14 +70,26 @@ window.addEventListener('keydown', e => {
 
 window.addEventListener('keyup', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
   if (e.code === 'Space') {
     spaceDown = false; panning = false; panStart = null;
     updateCursor();
   }
 });
 
+// ─── Mouse ───
+// ─── Global error handling ───
+window.onerror = (msg, src, line, col, err) => {
+  console.error('[GLOBAL ERROR]', msg, 'at', src, line, col, err);
+  return false;
+};
+
+window.addEventListener('unhandledrejection', e => {
+  console.error('[UNHANDLED REJECTION]', e.reason);
+});
+
 canvas.addEventListener('mousedown', e => {
+  e.preventDefault();
+  e.stopPropagation();
   if (mode === 'move' || spaceDown) {
     panning = true; panStart = { x: e.clientX, y: e.clientY };
     updateCursor();
@@ -69,13 +97,14 @@ canvas.addEventListener('mousedown', e => {
     const { x, y } = screenToWorld(e.clientX, e.clientY);
     const idx = nearestPoint(x, y, 15);
     if (idx !== null) {
-      draggingPointIdx = idx;
+      draggingPointId = getPointsArray()[idx].id;
       mapState.visual.editSelectedIdx = idx;
       syncPointDetailPanel(idx);
       updateCursor();
       draw();
     }
   }
+  return false;
 });
 
 canvas.addEventListener('mousemove', e => {
@@ -83,40 +112,64 @@ canvas.addEventListener('mousemove', e => {
     pan(e.clientX - panStart.x, e.clientY - panStart.y);
     panStart = { x: e.clientX, y: e.clientY };
     draw();
-  } else if (draggingPointIdx !== null) {
+  } else if (draggingPointId !== null) {
     const { x, y } = screenToWorld(e.clientX, e.clientY);
-    mapState.points[draggingPointIdx].x = x;
-    mapState.points[draggingPointIdx].y = y;
-    renderLists();
-    draw();
+    const p = getPointById(draggingPointId);
+    if (p) {
+      p.x = x;
+      p.y = y;
+      renderLists();
+      draw();
+    }
   }
+
+  // Track mouse world position for heartbeat
+  const { x, y } = screenToWorld(e.clientX, e.clientY);
+  mouseLastWorld = { x, y };
 });
 
 canvas.addEventListener('mouseup', () => {
-  panning = false; panStart = null; draggingPointIdx = null;
+  // Commit dragged point position to server
+  if (draggingPointId !== null) {
+    const p = getPointById(draggingPointId);
+    if (p) {
+      wsMovePoint(p.id, p.x, p.y);
+    }
+  }
+  panning = false; panStart = null; draggingPointId = null;
   updateCursor();
 });
 
 canvas.addEventListener('click', e => {
-  if (panning || spaceDown || mode === 'move') return;
+  console.log('[click]', mode, 'at', e.clientX, e.clientY);
+  e.preventDefault();
+  e.stopPropagation();
+  if (panning || spaceDown || mode === 'move') return false;
   const { x, y } = screenToWorld(e.clientX, e.clientY);
-  if (mode === 'point') { addPoint(x, y); return; }
+  if (mode === 'point') {
+    console.log('[click] calling wsAddPoint', x, y);
+    wsAddPoint(x, y, 'path', null, null);
+    return false;
+  }
 
   const idx = nearestPoint(x, y, 20);
   if (mode === 'edit') {
     mapState.visual.editSelectedIdx = idx;
     syncPointDetailPanel(idx);
     draw();
-    return;
+    return false;
   }
-  if (idx === null) return;
+  if (idx === null) return false;
 
-  mapState.visual.selected.push(idx);
+  const pts = getPointsArray();
+  const pointId = pts[idx].id;
+  mapState.visual.selected.push(pointId);
+
   if (mapState.visual.selected.length === 2) {
     const [a, b] = mapState.visual.selected;
     mapState.visual.selected = [];
     if (mode === 'edge') {
-      if (a !== b) addEdge(a, b);
+      if (a !== b) wsAddEdge(a, b);
     } else {
       mapState.session.pathResult = runAStar(mapState.points, mapState.edges, a, b);
       if (mapState.session.pathResult.length === 0 && a !== b) alert('Nenhum caminho encontrado!');
@@ -125,8 +178,27 @@ canvas.addEventListener('click', e => {
   } else {
     draw();
   }
+  return false;
 });
 
+// ─── Mouse heartbeat (~500ms) ───
+function startMouseHeartbeat() {
+  stopMouseHeartbeat();
+  mouseSendTimer = setInterval(() => {
+    if (isConnected()) {
+      sendMousePosition(mouseLastWorld.x, mouseLastWorld.y);
+    }
+  }, 500);
+}
+
+function stopMouseHeartbeat() {
+  if (mouseSendTimer) {
+    clearInterval(mouseSendTimer);
+    mouseSendTimer = null;
+  }
+}
+
+// ─── Mode ───
 function setMode(m) {
   mode = m;
   if (m !== 'move') prevMode = m;
@@ -145,54 +217,17 @@ function setMode(m) {
   draw();
 }
 
-function addPoint(x, y) {
-  mapState.points.push({ id: mapState.nextPId++, x, y, type: 'path' });
-  renderLists();
-  draw();
-}
-
-function addEdge(a, b) {
-  if (mapState.edges.some(e => (e.a === a && e.b === b) || (e.a === b && e.b === a))) return;
-  mapState.edges.push({ id: mapState.nextEId++, a, b });
-  renderLists();
-  draw();
-}
-
-function removePoint(pid) {
-  const idx = mapState.points.findIndex(p => p.id === pid);
-  if (idx === -1) return;
-  mapState.points.splice(idx, 1);
-  for (let i = mapState.edges.length - 1; i >= 0; i--) {
-    const e = mapState.edges[i];
-    if (e.a === idx || e.b === idx) mapState.edges.splice(i, 1);
-    else {
-      if (e.a > idx) e.a--;
-      if (e.b > idx) e.b--;
-    }
-  }
-  mapState.session.pathResult = [];
-  mapState.visual.selected = [];
-  renderLists();
-  draw();
-}
-
-function removeEdge(eid) {
-  const idx = mapState.edges.findIndex(e => e.id === eid);
-  if (idx !== -1) mapState.edges.splice(idx, 1);
-  mapState.session.pathResult = [];
-  renderLists();
-  draw();
-}
-
 function nearestPoint(wx, wy, radius) {
+  const pts = getPointsArray();
   let best = null, bestD = radius;
-  for (let i = 0; i < mapState.points.length; i++) {
-    const d = Math.hypot(mapState.points[i].x - wx, mapState.points[i].y - wy);
+  for (let i = 0; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - wx, pts[i].y - wy);
     if (d < bestD) { bestD = d; best = i; }
   }
   return best;
 }
 
+// ─── Background ───
 function uploadBackground() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -235,6 +270,7 @@ function updateMapZoom(value) {
   const valText = document.getElementById('map-zoom-val');
   if (valText) valText.textContent = camera.zoom.toFixed(2) + '×';
   draw();
+  return false;
 }
 
 canvas.addEventListener('wheel', e => {
@@ -247,11 +283,10 @@ canvas.addEventListener('wheel', e => {
   draw();
 }, { passive: false });
 
+// ─── Window exports ───
 window.setMode = setMode;
-window.removePoint = removePoint;
-window.removeEdge = removeEdge;
-window.exportJSON = () => doExport();
-window.importJSON = () => doImport(() => { syncBgUI(); renderLists(); draw(); });
+window.removePoint = (pid) => { wsRemovePoint(pid); };
+window.removeEdge = (eid) => { wsRemoveEdge(eid); };
 window.setHoveredPoint = (id) => { mapState.visual.hoveredPointId = id; draw(); };
 window.setHoveredEdge = (id) => { mapState.visual.hoveredEdgeId = id; draw(); };
 window.toggleBgPanel = () => document.getElementById('bg-panel').classList.toggle('open');
@@ -261,21 +296,187 @@ window.updateBgParam = updateBgParam;
 window.updateMapZoom = updateMapZoom;
 window.setPointType = (type) => {
   const idx = mapState.visual.editSelectedIdx;
-  if (idx === null || !mapState.points[idx]) return;
-  const p = mapState.points[idx];
+  if (idx === null || idx === undefined) return;
+  const pts = getPointsArray();
+  const p = pts[idx];
+  if (!p) return;
   p.type = type;
-  // Limpa metadados se voltou para 'path'
   if (type === 'path') { delete p.title; delete p.description; delete p.icon; }
+  wsUpdatePoint(p.id, type, p.establishment_id ?? null, p.map_icon_svg ?? null);
   syncPointDetailPanel(idx);
   renderLists();
   draw();
 };
 window.setPointMeta = (field, value) => {
   const idx = mapState.visual.editSelectedIdx;
-  if (idx === null || !mapState.points[idx]) return;
-  mapState.points[idx][field] = value;
-  draw(); // re-renderiza o ícone no canvas
+  if (idx === null || idx === undefined) return;
+  const pts = getPointsArray();
+  const p = pts[idx];
+  if (!p) return;
+  p[field] = value;
+  draw();
 };
 
-renderLists();
-draw();
+// ─── Floor selector & connection ───
+async function loadFloors() {
+  const listEl = document.getElementById('floor-list');
+  const overlayStatus = document.getElementById('floor-conn-status');
+
+  overlayStatus.textContent = 'Carregando floors...';
+  listEl.innerHTML = '';
+
+  try {
+    const floors = await listFloors();
+    if (!floors || floors.length === 0) {
+      listEl.innerHTML = '<div class="list-empty">Nenhum floor encontrado.</div>';
+      overlayStatus.textContent = 'Nenhum floor disponível';
+      return;
+    }
+    listEl.innerHTML = floors.map(f =>
+      `<div class="floor-item" onclick="event.preventDefault(); event.stopPropagation(); window.selectFloor(${f.id}); return false;">
+        <strong>${f.name}</strong>
+        <span class="floor-id">ID: ${f.id}</span>
+      </div>`
+    ).join('');
+    overlayStatus.textContent = `${floors.length} floor(s) disponível(is)`;
+  } catch (err) {
+    listEl.innerHTML = `<div class="list-empty" style="color:#e94560">Erro: ${err.message}</div>`;
+    overlayStatus.textContent = `Erro ao carregar floors`;
+  }
+}
+
+async function selectFloor(id) {
+  const overlay = document.getElementById('login-overlay');
+  const overlayStatus = document.getElementById('floor-conn-status');
+  const barStatus = document.getElementById('conn-status');
+
+  overlayStatus.textContent = 'Conectando...';
+
+  try {
+    const floorData = await getFloor(id);
+    loadFloorData(floorData);
+    await connect(id);
+    startMouseHeartbeat();
+    overlay.style.display = 'none';
+    syncBgUI();
+    renderLists();
+    draw();
+    if (barStatus) barStatus.textContent = `⚡ Conectado: ${mapState.floorName} (floor #${id})`;
+  } catch (err) {
+    overlayStatus.textContent = `Erro: ${err.message}`;
+    if (barStatus) barStatus.textContent = `Erro: ${err.message}`;
+  }
+}
+
+window.selectFloor = selectFloor;
+
+// Chamado pelo botão "Conectar" no overlay — lê o token do input e lista os floors
+window.connectWithToken = async function() {
+  const input = document.getElementById('token-input');
+  const token = input ? input.value.trim() : '';
+  if (!token) {
+    document.getElementById('floor-conn-status').textContent = '⚠️ Cole o token JWT acima';
+    return;
+  }
+  setAuthToken(token);
+  await loadFloors();
+};
+
+// ─── WebSocket event listeners ───
+on('point:added', (payload) => {
+  console.log('[point:added] payload=', payload);
+  console.trace('[point:added] stack');
+  mapState.points.set(payload.id, {
+    id: payload.id,
+    x: payload.x,
+    y: payload.y,
+    type: payload.type || 'path',
+    establishment_id: payload.establishment_id,
+    map_icon_svg: payload.map_icon_svg,
+    floor_id: payload.floor_id
+  });
+  console.log('[point:added] before renderLists');
+  renderLists();
+  console.log('[point:added] before draw');
+  draw();
+  console.log('[point:added] done');
+});
+
+on('point:moved', (payload) => {
+  const p = mapState.points.get(payload.id);
+  if (p) {
+    p.x = payload.x;
+    p.y = payload.y;
+  }
+  renderLists();
+  draw();
+});
+
+on('point:updated', (payload) => {
+  const p = mapState.points.get(payload.id);
+  if (p) {
+    p.type = payload.type;
+    p.establishment_id = payload.establishment_id;
+    p.map_icon_svg = payload.map_icon_svg;
+  }
+  renderLists();
+  draw();
+});
+
+on('point:removed', (payload) => {
+  mapState.points.delete(payload.id);
+  for (const [eid, e] of mapState.edges) {
+    if (e.from_point_id === payload.id || e.to_point_id === payload.id) {
+      mapState.edges.delete(eid);
+    }
+  }
+  mapState.session.pathResult = [];
+  mapState.visual.selected = [];
+  if (mapState.visual.editSelectedIdx !== null) {
+    const pts = getPointsArray();
+    if (!pts[mapState.visual.editSelectedIdx]) {
+      mapState.visual.editSelectedIdx = null;
+      syncPointDetailPanel(null);
+    }
+  }
+  renderLists();
+  draw();
+});
+
+on('edge:added', (payload) => {
+  mapState.edges.set(payload.id, {
+    id: payload.id,
+    from_point_id: payload.from_point_id,
+    to_point_id: payload.to_point_id,
+    group_id: payload.group_id
+  });
+  renderLists();
+  draw();
+});
+
+on('edge:removed', (payload) => {
+  mapState.edges.delete(payload.id);
+  mapState.session.pathResult = [];
+  renderLists();
+  draw();
+});
+
+on('background:changed', (payload) => {
+  if (payload.background_svg) {
+    mapState.background.svgContent = payload.background_svg;
+    loadSvgToImage(payload.background_svg, img => {
+      mapState.background.image = img;
+      syncBgUI();
+      draw();
+    });
+  }
+});
+
+on('ws:close', () => {
+  stopMouseHeartbeat();
+  const barStatus = document.getElementById('conn-status');
+  if (barStatus) barStatus.textContent = '⚠️ Desconectado — recarregue a página';
+});
+
+// ─── Init ───
+// Nada automático — o usuário cola o token e clica em Conectar.

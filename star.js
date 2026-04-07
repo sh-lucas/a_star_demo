@@ -1,49 +1,61 @@
-// ---- A* ----
-function dist(points, a, b) {
-  return Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y);
+// star.js — A* pathfinding usando DB IDs em vez de índices de array
+// Recebe Map<id, point> e Map<id, edge>, retorna array de point DB IDs
+
+function dist(pointsMap, aId, bId) {
+  const a = pointsMap.get(aId);
+  const b = pointsMap.get(bId);
+  if (!a || !b) return Infinity;
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function buildAdj(points, edges) {
-  const adj = Array.from({ length: points.length }, () => []);
-  for (const e of edges) {
-    const w = dist(points, e.a, e.b);
-    adj[e.a].push({ to: e.b, w });
-    adj[e.b].push({ to: e.a, w });
+function buildAdj(pointsMap, edgesMap) {
+  const adj = new Map(); // pointId -> [{ to: pointId, w }]
+  for (const pid of pointsMap.keys()) {
+    adj.set(pid, []);
+  }
+  for (const e of edgesMap.values()) {
+    const w = dist(pointsMap, e.from_point_id, e.to_point_id);
+    if (adj.has(e.from_point_id)) adj.get(e.from_point_id).push({ to: e.to_point_id, w });
+    if (adj.has(e.to_point_id)) adj.get(e.to_point_id).push({ to: e.from_point_id, w });
   }
   return adj;
 }
 
-export function runAStar(points, edges, start, goal) {
-  if (start === goal) return [start];
+export function runAStar(pointsMap, edgesMap, startId, goalId) {
+  if (startId === goalId) return [startId];
+  if (!pointsMap.has(startId) || !pointsMap.has(goalId)) return [];
 
-  const adj = buildAdj(points, edges);
-  const n = points.length;
-  const g = new Array(n).fill(Infinity);
-  const f = new Array(n).fill(Infinity);
-  const prev = new Array(n).fill(-1);
+  const adj = buildAdj(pointsMap, edgesMap);
+  const g = new Map();  // pointId -> cost
+  const f = new Map();  // pointId -> estimated total cost
+  const prev = new Map(); // pointId -> previous pointId
   const open = new Set();
 
-  g[start] = 0;
-  f[start] = dist(points, start, goal);
-  open.add(start);
+  g.set(startId, 0);
+  f.set(startId, dist(pointsMap, startId, goalId));
+  open.add(startId);
 
   while (open.size > 0) {
     let cur = null;
-    for (const node of open) if (cur === null || f[node] < f[cur]) cur = node;
+    for (const node of open) {
+      if (cur === null || f.get(node) < f.get(cur)) cur = node;
+    }
 
-    if (cur === goal) {
+    if (cur === goalId) {
       const path = [];
-      let c = goal;
-      while (c !== -1) { path.push(c); c = prev[c]; }
+      let c = goalId;
+      while (c !== undefined) { path.push(c); c = prev.get(c); }
       return path.reverse();
     }
+
     open.delete(cur);
-    for (const { to, w } of adj[cur]) {
-      const tentG = g[cur] + w;
-      if (tentG < g[to]) {
-        g[to] = tentG;
-        f[to] = tentG + dist(points, to, goal);
-        prev[to] = cur;
+    const neighbors = adj.get(cur) || [];
+    for (const { to, w } of neighbors) {
+      const tentG = g.get(cur) + w;
+      if (tentG < (g.get(to) ?? Infinity)) {
+        g.set(to, tentG);
+        f.set(to, tentG + dist(pointsMap, to, goalId));
+        prev.set(to, cur);
         open.add(to);
       }
     }

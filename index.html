@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Editor de Mapa A*</title>
+  <script>
+    window.addEventListener('submit', e => { e.preventDefault(); return false; });
+    // Debug: captura o momento exato do unload com stack trace
+    window.addEventListener('beforeunload', () => {
+      console.error('[BEFOREUNLOAD] Página vai recarregar/navegar. Stack:', new Error().stack);
+    });
+  </script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #1a1a2e; overflow: hidden; font-family: monospace; }
@@ -235,7 +242,6 @@
     #point-detail .pd-title {
       font-size: 11px;
       color: #888;
-      /*text-transform: uppercase;*/
       border-bottom: 1px solid #333;
       padding-bottom: 6px;
       margin-bottom: 2px;
@@ -253,7 +259,6 @@
       font-size: 11px;
       color: #888;
       width: 70px;
-      /*flex-shrink: 0;*/
     }
     #point-detail select,
     #point-detail input[type=text],
@@ -282,33 +287,123 @@
     .type-dot.path { background: #4fc3f7; }
     .type-dot.start { background: #66bb6a; }
     .type-dot.destination { background: #e94560; }
+
+    /* ---- Connection Status Bar ---- */
+    #conn-status {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0f172a;
+      border-top: 1px solid #333;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: #888;
+      z-index: 10;
+      text-align: center;
+    }
+
+    /* ---- Floor Selector Overlay ---- */
+    #login-overlay {
+      display: flex;
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 30, 0.95);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+    }
+    #login-overlay.hidden { display: none; }
+    .login-box {
+      background: #16213e;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 24px;
+      width: 360px;
+      max-width: 90vw;
+    }
+    .login-box h2 {
+      color: #e94560;
+      font-size: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .login-box .floor-list {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+    .floor-item {
+      padding: 10px 12px;
+      color: #ccc;
+      cursor: pointer;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .floor-item:last-child { border-bottom: none; }
+    .floor-item:hover { background: #0f3460; color: #fff; }
+    .floor-item .floor-id {
+      font-size: 10px;
+      color: #666;
+    }
+    .login-box .status {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #888;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <!-- Floor selector overlay -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2>Editor de Mapa</h2>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <input id="token-input" type="text" placeholder="Cole o JWT token aqui..."
+               style="flex:1;background:#0f172a;color:#fff;border:1px solid #444;border-radius:4px;padding:6px 8px;font:inherit;font-size:12px;">
+        <button type="button" onclick="event.preventDefault(); window.connectWithToken(); return false;"
+                style="padding:6px 12px;background:#0f3460;color:#fff;border:1px solid #e94560;border-radius:4px;cursor:pointer;font:inherit;font-size:12px;white-space:nowrap;">
+          Conectar
+        </button>
+      </div>
+      <div class="floor-list" id="floor-list"></div>
+      <div class="status" id="floor-conn-status">Cole o token e clique em Conectar</div>
+    </div>
+  </div>
+
   <div id="bg-layer"></div>
   <canvas id="canvas"></canvas>
 
   <div id="zoom-panel">
     <label>Zoom</label>
     <input id="map-zoom" type="range" min="0.05" max="10" step="0.01" value="1"
-           oninput="window.updateMapZoom(this.value)">
+           oninput="window.updateMapZoom(this.value); return false;">
     <span id="map-zoom-val">1.00×</span>
   </div>
 
   <div id="panel">
-    <button class="mode-btn active" id="btn-move" onclick="window.setMode('move')">🖐️ Mover Mapa</button>
-    <button class="mode-btn" id="btn-point" onclick="window.setMode('point')">➕ Adicionar Ponto</button>
-    <button class="mode-btn" id="btn-edge" onclick="window.setMode('edge')">🔗 Adicionar Aresta</button>
-    <button class="mode-btn" id="btn-edit" onclick="window.setMode('edit')">✏️ Editar Ponto</button>
-    <button class="mode-btn" id="btn-path" onclick="window.setMode('path')">🔍 Achar Caminho</button>
+    <button type="button" class="mode-btn active" id="btn-move" onclick="window.setMode('move'); return false;">🖐️ Mover Mapa</button>
+    <button type="button" class="mode-btn" id="btn-point" onclick="window.setMode('point'); return false;">➕ Adicionar Ponto</button>
+    <button type="button" class="mode-btn" id="btn-edge" onclick="window.setMode('edge'); return false;">🔗 Adicionar Aresta</button>
+    <button type="button" class="mode-btn" id="btn-edit" onclick="window.setMode('edit'); return false;">✏️ Editar Ponto</button>
+    <button type="button" class="mode-btn" id="btn-path" onclick="window.setMode('path'); return false;">🔍 Achar Caminho</button>
 
-    <div class="io-row">
-      <button class="io-btn" onclick="window.exportJSON()">⬇ Export</button>
-      <button class="io-btn" onclick="window.importJSON()">⬆ Import</button>
+    <div class="list-section">
+      <div class="list-title">Pontos</div>
+      <div id="point-list"></div>
+    </div>
+
+    <div class="list-section">
+      <div class="list-title">Arestas</div>
+      <div id="edge-list"></div>
     </div>
 
     <!-- Background SVG upload + controls -->
-    <button id="bg-btn" onclick="window.toggleBgPanel()">🖼️ Background SVG</button>
+    <button type="button" id="bg-btn" onclick="window.toggleBgPanel(); return false;">🖼️ Background SVG</button>
     <div id="bg-panel">
       <div class="bg-row">
         <label>Offset X</label>
@@ -321,23 +416,11 @@
                oninput="window.updateBgParam('oy', this.value)">
       </div>
       <div class="bg-row" style="justify-content:space-between">
-        <button id="bg-clear" onclick="window.clearBackground()">✕ Remover</button>
-        <button class="io-btn" style="flex:unset;padding:4px 8px;font-size:11px" onclick="window.uploadBackground()">📁 Escolher SVG</button>
+        <button type="button" id="bg-clear" onclick="window.clearBackground(); return false;">✕ Remover</button>
+        <button type="button" class="io-btn" style="flex:unset;padding:4px 8px;font-size:11px" onclick="window.uploadBackground(); return false;">📁 Escolher SVG</button>
       </div>
     </div>
-
-    <div class="list-section">
-      <div class="list-title">Pontos</div>
-      <div id="point-list"></div>
-    </div>
-
-    <div class="list-section">
-      <div class="list-title">Arestas</div>
-      <div id="edge-list"></div>
-    </div>
   </div>
-
-
 
   <!-- Point Detail Panel (aparece em modo de edição) -->
   <div id="point-detail">
@@ -347,7 +430,7 @@
     </div>
     <div class="pd-row">
       <label>Tipo</label>
-      <select id="pd-type" onchange="window.setPointType(this.value)">
+      <select id="pd-type" onchange="window.setPointType(this.value); return false;">
         <option value="path">🔵 Rota (path)</option>
         <option value="start">🟢 Início (start)</option>
         <option value="destination">🔴 Destino (destination)</option>
@@ -356,18 +439,21 @@
     <div class="pd-meta" id="pd-meta">
       <div class="pd-row">
         <label>Título</label>
-        <input type="text" id="pd-title" placeholder="ex: Sala A" oninput="window.setPointMeta('title', this.value)">
+        <input type="text" id="pd-title" placeholder="ex: Sala A" oninput="window.setPointMeta('title', this.value); return false;">
       </div>
       <div class="pd-row">
         <label>Descrição</label>
-        <textarea id="pd-desc" placeholder="ex: Sala de reuniões" oninput="window.setPointMeta('description', this.value)"></textarea>
+        <textarea id="pd-desc" placeholder="ex: Sala de reuniões" oninput="window.setPointMeta('description', this.value); return false;"></textarea>
       </div>
       <div class="pd-row">
         <label>Ícone</label>
-        <input type="text" id="pd-icon" placeholder="ex: 🏠" oninput="window.setPointMeta('icon', this.value)">
+        <input type="text" id="pd-icon" placeholder="ex: 🏠" oninput="window.setPointMeta('icon', this.value); return false;">
       </div>
     </div>
   </div>
+
+  <!-- Connection status bar -->
+  <div id="conn-status"></div>
 
   <script type="module" src="./script.js"></script>
 </body>
