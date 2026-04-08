@@ -1,5 +1,6 @@
 // api.js — REST + WebSocket client para o total-map-backend
-const API_BASE = 'http://localhost:3000';
+// const API_BASE = 'http://localhost:3000';
+const API_BASE = 'https://api.totem.total.roxcode.io';
 
 export let AUTH_TOKEN = '';
 
@@ -94,7 +95,7 @@ function send(event, payload) {
 // script.js takes care of keeping the connection alive via mouse:position
 // events on mousemove. startHeartbeat/stopHeartbeat are kept as no-ops so
 // the connect/disconnect flow doesn't need to change.
-function startHeartbeat() {}
+function startHeartbeat() { }
 function stopHeartbeat() {
     if (heartbeatTimer) {
         clearInterval(heartbeatTimer);
