@@ -29,7 +29,39 @@ let spaceDown = false;
 let panning = false;
 let panStart = null;
 let mouseLastWorld = { x: 0, y: 0 };
-let mouseSendTimer = null;
+
+// ─── Mouse-position throttle ───
+// Send at most 6 times per second, and only when the position actually changed.
+const MOUSE_THROTTLE_MS = Math.round(1000 / 6); // ~166 ms
+let mouseThrottleTimer = null;
+let mousePendingSend = false;   // true when a new position is waiting to be sent
+let mouseLastSent = null;       // last { x, y } we sent to the server
+
+function scheduleMouseSend() {
+  if (mouseThrottleTimer !== null) {
+    // Already scheduled — just mark that we have a fresh position.
+    mousePendingSend = true;
+    return;
+  }
+  // Send immediately, then start the throttle window.
+  flushMousePosition();
+  mouseThrottleTimer = setTimeout(() => {
+    mouseThrottleTimer = null;
+    if (mousePendingSend) {
+      mousePendingSend = false;
+      flushMousePosition();
+    }
+  }, MOUSE_THROTTLE_MS);
+}
+
+function flushMousePosition() {
+  if (!isConnected()) return;
+  const { x, y } = mouseLastWorld;
+  // Skip if position hasn't changed since last send.
+  if (mouseLastSent && mouseLastSent.x === x && mouseLastSent.y === y) return;
+  mouseLastSent = { x, y };
+  sendMousePosition(x, y);
+}
 
 const canvas = document.getElementById('canvas');
 
@@ -123,9 +155,16 @@ canvas.addEventListener('mousemove', e => {
     }
   }
 
-  // Track mouse world position for heartbeat
+  // Track mouse world position and schedule a throttled send (max 6x/s).
   const { x, y } = screenToWorld(e.clientX, e.clientY);
   mouseLastWorld = { x, y };
+  scheduleMouseSend();
+});
+
+// When the mouse leaves the canvas, hide this client's cursor for others.
+canvas.addEventListener('mouseleave', () => {
+  if (isConnected()) sendMousePosition(null, null);
+  mouseLastSent = null; // force re-send on next entry
 });
 
 canvas.addEventListener('mouseup', () => {
@@ -180,23 +219,6 @@ canvas.addEventListener('click', e => {
   }
   return false;
 });
-
-// ─── Mouse heartbeat (~500ms) ───
-function startMouseHeartbeat() {
-  stopMouseHeartbeat();
-  mouseSendTimer = setInterval(() => {
-    if (isConnected()) {
-      sendMousePosition(mouseLastWorld.x, mouseLastWorld.y);
-    }
-  }, 500);
-}
-
-function stopMouseHeartbeat() {
-  if (mouseSendTimer) {
-    clearInterval(mouseSendTimer);
-    mouseSendTimer = null;
-  }
-}
 
 // ─── Mode ───
 function setMode(m) {
@@ -356,7 +378,6 @@ async function selectFloor(id) {
     const floorData = await getFloor(id);
     loadFloorData(floorData);
     await connect(id);
-    startMouseHeartbeat();
     overlay.style.display = 'none';
     syncBgUI();
     renderLists();
@@ -473,7 +494,7 @@ on('background:changed', (payload) => {
 });
 
 on('ws:close', () => {
-  stopMouseHeartbeat();
+  mouseLastSent = null; // reset so we re-send on reconnect
   const barStatus = document.getElementById('conn-status');
   if (barStatus) barStatus.textContent = '⚠️ Desconectado — recarregue a página';
 });

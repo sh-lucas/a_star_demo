@@ -91,13 +91,14 @@ function send(event, payload) {
 }
 
 // ─── Heartbeat (keeps connection alive — server closes after 5s of silence) ───
+// Mouse-position throttling in script.js resets this naturally up to 6x/s.
+// The fallback here fires only if no message has been sent for 2 s (e.g. idle).
 function startHeartbeat() {
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
-        // Will be overridden by sendMousePosition() calls from script.js,
-        // but this is the fallback in case the mouse hasn't moved
-        if (isConnected()) send('mouse:position', { x: 0, y: 0 });
-    }, 500);
+        // Send a null position so others hide our cursor while we are idle.
+        if (isConnected()) send('mouse:position', { x: null, y: null });
+    }, 2000);
 }
 
 function stopHeartbeat() {
@@ -169,14 +170,19 @@ export function connect(floorId) {
                     break;
 
                 case 'mouse:position':
-                    // Only update remote cursors (we never receive our own)
+                    // Only update remote cursors (we never receive our own).
+                    // If x or y is null the sender is hiding its cursor.
                     if (payload.conn_id !== undefined) {
-                        remoteCursors.set(payload.conn_id, {
-                            x: payload.x,
-                            y: payload.y,
-                            email: payload.email,
-                            userId: payload.user_id,
-                        });
+                        if (payload.x == null || payload.y == null) {
+                            remoteCursors.delete(payload.conn_id);
+                        } else {
+                            remoteCursors.set(payload.conn_id, {
+                                x: payload.x,
+                                y: payload.y,
+                                email: payload.email,
+                                userId: payload.user_id,
+                            });
+                        }
                     }
                     break;
 
@@ -229,8 +235,9 @@ export function wsRemoveEdge(id) {
     send('edge:remove', { id });
 }
 
+// x and y can be numbers (world coords) or null to hide this client's cursor.
 export function sendMousePosition(x, y) {
-    send('mouse:position', { x, y });
+    send('mouse:position', { x: x ?? null, y: y ?? null });
 }
 
 export { API_BASE };
