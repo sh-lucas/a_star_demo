@@ -90,17 +90,11 @@ function send(event, payload) {
     ws.send(JSON.stringify({ event, payload }));
 }
 
-// ─── Heartbeat (keeps connection alive — server closes after 5s of silence) ───
-// Mouse-position throttling in script.js resets this naturally up to 6x/s.
-// The fallback here fires only if no message has been sent for 2 s (e.g. idle).
-function startHeartbeat() {
-    stopHeartbeat();
-    heartbeatTimer = setInterval(() => {
-        // Send a null position so others hide our cursor while we are idle.
-        if (isConnected()) send('mouse:position', { x: null, y: null });
-    }, 2000);
-}
-
+// ─── Heartbeat ───
+// script.js takes care of keeping the connection alive via mouse:position
+// events on mousemove. startHeartbeat/stopHeartbeat are kept as no-ops so
+// the connect/disconnect flow doesn't need to change.
+function startHeartbeat() {}
 function stopHeartbeat() {
     if (heartbeatTimer) {
         clearInterval(heartbeatTimer);

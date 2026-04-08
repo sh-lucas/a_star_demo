@@ -1,10 +1,48 @@
-import { camera, prepareCanvas, finishCanvas } from './camera.js';
+import { camera, prepareCanvas, finishCanvas, worldToScreen } from './camera.js';
 import { mapState, getPointsArray, getEdgesArray } from './map.js';
 import { remoteCursors } from './api.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
+// Interpolated screen positions for remote cursors.
+// conn_id -> { x, y }  (screen space, updated every frame)
+const cursorSmoothed = new Map();
+const LERP = 0.22;
+
+function getSmoothed(connId, targetX, targetY) {
+  const prev = cursorSmoothed.get(connId);
+  if (!prev) {
+    // First time we see this cursor — snap to position, no lerp.
+    cursorSmoothed.set(connId, { x: targetX, y: targetY });
+    return { x: targetX, y: targetY };
+  }
+  const x = prev.x + (targetX - prev.x) * LERP;
+  const y = prev.y + (targetY - prev.y) * LERP;
+  cursorSmoothed.set(connId, { x, y });
+  return { x, y };
+}
+
+// Continuous rAF loop while any remote cursor is visible, so lerp animates
+// between position updates instead of only on the frames draw() is called.
+let rafLoopId = null;
+
+function startCursorLoop() {
+  if (rafLoopId !== null) return;
+  function loop() {
+    if (remoteCursors.size === 0) {
+      rafLoopId = null;
+      return;
+    }
+    draw();
+    rafLoopId = requestAnimationFrame(loop);
+  }
+  rafLoopId = requestAnimationFrame(loop);
+}
+
+export function notifyCursorUpdate() {
+  startCursorLoop();
+}
 export function syncBGLayer() {
   const layer = document.getElementById('bg-layer');
   if (!layer) return;
@@ -94,23 +132,31 @@ export function draw() {
     ctx.fillText(label, p.x + 12, p.y - 8);
   }
 
-  // Remote cursors
+  finishCanvas(ctx);
+
+  // Remote cursors — drawn in screen space (outside the camera transform),
+  // with lerp smoothing so the dot glides instead of jumping.
+  // Clean up smoothed state for cursors that are no longer present.
+  for (const connId of cursorSmoothed.keys()) {
+    if (!remoteCursors.has(connId)) cursorSmoothed.delete(connId);
+  }
+
   for (const [connId, cursor] of remoteCursors) {
+    const target = worldToScreen(cursor.x, cursor.y);
+    const { x, y } = getSmoothed(connId, target.x, target.y);
+
     ctx.beginPath();
-    ctx.arc(cursor.x, cursor.y, 5, 0, Math.PI * 2);
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 204, 0, 0.7)';
     ctx.fill();
     ctx.strokeStyle = '#ffcc00';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Label with email
     ctx.fillStyle = '#ffcc00';
     ctx.font = '10px monospace';
-    ctx.fillText(cursor.email || `User ${cursor.userId}`, cursor.x + 8, cursor.y - 6);
+    ctx.fillText(cursor.email || `User ${cursor.userId}`, x + 8, y - 6);
   }
-
-  finishCanvas(ctx);
 }
 
 export function renderLists() {

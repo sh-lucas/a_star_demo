@@ -12,6 +12,14 @@ export function screenToWorld(sx, sy) {
   };
 }
 
+/** Converte coordenada de mundo → tela */
+export function worldToScreen(wx, wy) {
+  return {
+    x: wx * camera.zoom + camera.x,
+    y: wy * camera.zoom + camera.y,
+  };
+}
+
 /** Aplica a transformação de câmera ao contexto do canvas */
 export function applyTransform(ctx) {
   ctx.translate(camera.x, camera.y);
