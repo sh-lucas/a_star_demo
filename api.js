@@ -1,6 +1,6 @@
 // api.js — REST + WebSocket client para o total-map-backend
-const API_BASE = 'http://localhost:3000';
-// const API_BASE = 'https://api.totem.total.roxcode.io';
+// const API_BASE = 'http://localhost:3000';
+const API_BASE = 'https://api.totem.total.roxcode.io';
 
 export let AUTH_TOKEN = '';
 
