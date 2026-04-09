@@ -224,7 +224,40 @@ export function syncBgUI() {
   if (oyInput) oyInput.value = Math.round(mapState.background.offsetY);
 }
 
-/** Mostra/atualiza/oculta o painel de detalhes do ponto selecionado */
+/**
+ * Populate the establishment sub-panel with data from the API.
+ * Pass null to clear/reset the fields.
+ * @param {object|null} est
+ */
+export function syncEstablishmentPanel(est) {
+  const nameEl   = document.getElementById('pd-estab-name');
+  const descEl   = document.getElementById('pd-estab-desc');
+  const hoursEl  = document.getElementById('pd-estab-hours');
+  const preview  = document.getElementById('pd-estab-icon-preview');
+  const fileEl   = document.getElementById('pd-estab-icon-file');
+  const statusEl = document.getElementById('pd-estab-status');
+
+  if (nameEl)  nameEl.value  = est?.name         || '';
+  if (descEl)  descEl.value  = est?.description   || '';
+  if (hoursEl) hoursEl.value = est?.opening_hours || '';
+
+  // Reset pending file selection
+  if (fileEl) fileEl.value = '';
+
+  // Show/hide icon preview
+  if (preview) {
+    if (est?.icon_data && est?.icon_type) {
+      const mime = est.icon_type === 'svg' ? 'image/svg+xml' : 'image/webp';
+      preview.src = `data:${mime};base64,${est.icon_data}`;
+      preview.classList.add('visible');
+    } else {
+      preview.src = '';
+      preview.classList.remove('visible');
+    }
+  }
+
+  if (statusEl) statusEl.textContent = '';
+}
 export function syncPointDetailPanel(idx) {
   const panel = document.getElementById('point-detail');
   if (!panel) return;
@@ -264,5 +297,11 @@ export function syncPointDetailPanel(idx) {
     if (title) title.value = p.title || '';
     if (desc) desc.value = p.description || '';
     if (icon) icon.value = p.icon || '';
+  }
+
+  // Mostra/esconde secção de estabelecimento (somente para destination)
+  const estabSection = document.getElementById('pd-estab');
+  if (estabSection) {
+    estabSection.classList.toggle('visible', type === 'destination');
   }
 }

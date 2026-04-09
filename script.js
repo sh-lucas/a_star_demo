@@ -1,7 +1,7 @@
 import { camera, screenToWorld, pan, zoomAt, setZoom, handleResize } from './camera.js';
 import { runAStar } from './star.js';
 import { mapState, getPointsArray, getEdgesArray, findPointIndexById, getPointById, loadFloorData, loadSvgToImage } from './map.js';
-import { draw, renderLists, syncBgUI, syncPointDetailPanel, notifyCursorUpdate } from './render.js';
+import { draw, renderLists, syncBgUI, syncPointDetailPanel, syncEstablishmentPanel, notifyCursorUpdate } from './render.js';
 import {
   setAuthToken,
   listFloors, getFloor,
@@ -9,6 +9,7 @@ import {
   wsAddPoint, wsMovePoint, wsUpdatePoint, wsRemovePoint,
   wsAddEdge, wsRemoveEdge,
   sendMousePosition,
+  getEstablishment, upsertEstablishment, deleteEstablishment as apiDeleteEstablishment,
   on, off,
   remoteCursors
 } from './api.js';
@@ -100,6 +101,7 @@ canvas.addEventListener('mousedown', e => {
       draggingPointId = getPointsArray()[idx].id;
       mapState.visual.editSelectedIdx = idx;
       syncPointDetailPanel(idx);
+      loadEstablishmentForPoint(getPointsArray()[idx]);
       updateCursor();
       draw();
     }
@@ -171,6 +173,7 @@ canvas.addEventListener('click', e => {
   if (mode === 'edit') {
     mapState.visual.editSelectedIdx = idx;
     syncPointDetailPanel(idx);
+    if (idx !== null) loadEstablishmentForPoint(getPointsArray()[idx]);
     draw();
     return false;
   }
@@ -337,6 +340,7 @@ window.setPointType = (type) => {
   if (type === 'path') { delete p.title; delete p.description; delete p.icon; }
   wsUpdatePoint(p.id, type, p.establishment_id ?? null, p.map_icon_svg ?? null);
   syncPointDetailPanel(idx);
+  loadEstablishmentForPoint(p);
   renderLists();
   draw();
 };
@@ -349,6 +353,105 @@ window.setPointMeta = (field, value) => {
   p[field] = value;
   draw();
 };
+
+// ─── Establishment panel handlers ───
+
+// Track a pending icon File selected by the user (not yet saved).
+let _pendingIconFile = null;
+
+window.onEstabIconChange = (input) => {
+  _pendingIconFile = input.files[0] || null;
+  // Show a local preview immediately.
+  if (_pendingIconFile) {
+    const preview = document.getElementById('pd-estab-icon-preview');
+    if (preview) {
+      preview.src = URL.createObjectURL(_pendingIconFile);
+      preview.classList.add('visible');
+    }
+  }
+};
+
+window.saveEstablishment = async () => {
+  const idx = mapState.visual.editSelectedIdx;
+  if (idx === null || idx === undefined) return;
+  const pts = getPointsArray();
+  const p = pts[idx];
+  if (!p || p.type !== 'destination') return;
+
+  const nameEl   = document.getElementById('pd-estab-name');
+  const descEl   = document.getElementById('pd-estab-desc');
+  const hoursEl  = document.getElementById('pd-estab-hours');
+  const statusEl = document.getElementById('pd-estab-status');
+  const saveBtn  = document.getElementById('pd-estab-save');
+
+  const name = nameEl?.value?.trim() || '';
+  if (!name) {
+    if (statusEl) statusEl.textContent = '⚠️ Nome é obrigatório';
+    return;
+  }
+
+  if (saveBtn) saveBtn.disabled = true;
+  if (statusEl) statusEl.textContent = 'Salvando...';
+
+  try {
+    const est = await upsertEstablishment(p.id, {
+      name,
+      description:   descEl?.value?.trim()  || '',
+      opening_hours: hoursEl?.value?.trim() || '',
+    }, _pendingIconFile);
+
+    // Update local point state so establishment_id is reflected.
+    if (est?.id) p.establishment_id = est.id;
+    _pendingIconFile = null;
+    // Refresh the file input + preview from the saved data.
+    syncEstablishmentPanel(est);
+    if (statusEl) statusEl.textContent = '✔ Salvo!';
+    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+  } catch (err) {
+    if (statusEl) statusEl.textContent = `❌ ${err.message}`;
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+};
+
+window.deleteEstablishment = async () => {
+  const idx = mapState.visual.editSelectedIdx;
+  if (idx === null || idx === undefined) return;
+  const pts = getPointsArray();
+  const p = pts[idx];
+  if (!p || p.type !== 'destination') return;
+
+  const statusEl = document.getElementById('pd-estab-status');
+  if (statusEl) statusEl.textContent = 'Removendo...';
+
+  try {
+    await apiDeleteEstablishment(p.id);
+    p.establishment_id = null;
+    _pendingIconFile = null;
+    syncEstablishmentPanel(null);
+    if (statusEl) statusEl.textContent = '✔ Removido';
+    setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
+  } catch (err) {
+    if (statusEl) statusEl.textContent = `❌ ${err.message}`;
+  }
+};
+
+/** Load establishment data from server when a destination point is selected. */
+async function loadEstablishmentForPoint(p) {
+  if (!p || p.type !== 'destination') {
+    syncEstablishmentPanel(null);
+    return;
+  }
+  _pendingIconFile = null;
+  // Optimistically clear while loading.
+  syncEstablishmentPanel(null);
+  try {
+    const est = await getEstablishment(p.id);
+    syncEstablishmentPanel(est); // est may be null (no establishment yet)
+  } catch (err) {
+    console.warn('[establishment] failed to load:', err.message);
+  }
+}
 
 // ─── Floor selector & connection ───
 async function loadFloors() {

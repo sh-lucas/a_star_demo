@@ -235,4 +235,59 @@ export function sendMousePosition(x, y) {
     send('mouse:position', { x: x ?? null, y: y ?? null });
 }
 
+// ─── Establishment REST API ───
+/**
+ * Fetch the establishment linked to a point.
+ * Returns null (instead of throwing) when there is no establishment yet (404).
+ */
+export async function getEstablishment(pointId) {
+    try {
+        return await apiFetch(`/points/${pointId}/establishment`);
+    } catch (err) {
+        if (err.message && err.message.includes('404')) return null;
+        throw err;
+    }
+}
+
+/**
+ * Create or update the establishment for a point.
+ * @param {number} pointId
+ * @param {{ name: string, description?: string, opening_hours?: string }} fields
+ * @param {File|null} iconFile  - optional image file (webp or svg)
+ */
+export async function upsertEstablishment(pointId, fields, iconFile = null) {
+    const form = new FormData();
+    form.append('name', fields.name || '');
+    if (fields.description) form.append('description', fields.description);
+    if (fields.opening_hours) form.append('opening_hours', fields.opening_hours);
+    if (iconFile) form.append('icon', iconFile);
+
+    const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
+        body: form,
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
+/**
+ * Remove the establishment linked to a point.
+ */
+export async function deleteEstablishment(pointId) {
+    const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
+    });
+    if (res.status === 204) return null;
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    return null;
+}
+
 export { API_BASE };
