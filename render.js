@@ -233,8 +233,8 @@ export function syncEstablishmentPanel(est) {
   const nameEl   = document.getElementById('pd-estab-name');
   const descEl   = document.getElementById('pd-estab-desc');
   const hoursEl  = document.getElementById('pd-estab-hours');
-  const preview  = document.getElementById('pd-estab-icon-preview');
-  const fileEl   = document.getElementById('pd-estab-icon-file');
+  const preview  = document.getElementById('pd-estab-banner-preview');
+  const fileEl   = document.getElementById('pd-estab-banner-file');
   const statusEl = document.getElementById('pd-estab-status');
 
   if (nameEl)  nameEl.value  = est?.name         || '';
@@ -244,11 +244,10 @@ export function syncEstablishmentPanel(est) {
   // Reset pending file selection
   if (fileEl) fileEl.value = '';
 
-  // Show/hide icon preview
+  // Show/hide banner preview from banner_data (base64-encoded WebP)
   if (preview) {
-    if (est?.icon_data && est?.icon_type) {
-      const mime = est.icon_type === 'svg' ? 'image/svg+xml' : 'image/webp';
-      preview.src = `data:${mime};base64,${est.icon_data}`;
+    if (est?.banner_data) {
+      preview.src = `data:image/webp;base64,${est.banner_data}`;
       preview.classList.add('visible');
     } else {
       preview.src = '';
@@ -292,11 +291,22 @@ export function syncPointDetailPanel(idx) {
 
   if (hasMeta) {
     const title = document.getElementById('pd-title');
-    const desc = document.getElementById('pd-desc');
-    const icon = document.getElementById('pd-icon');
+    const iconFile = document.getElementById('pd-icon-file');
+    const iconPreview = document.getElementById('pd-icon-preview');
+    
     if (title) title.value = p.title || '';
-    if (desc) desc.value = p.description || '';
-    if (icon) icon.value = p.icon || '';
+    if (iconFile) iconFile.value = '';
+    
+    // Show SVG preview if available
+    if (iconPreview) {
+      if (p.map_icon_svg && p.map_icon_svg.startsWith('<svg')) {
+        iconPreview.innerHTML = p.map_icon_svg;
+        iconPreview.style.display = 'block';
+      } else {
+        iconPreview.innerHTML = '';
+        iconPreview.style.display = 'none';
+      }
+    }
   }
 
   // Mostra/esconde secção de estabelecimento (somente para destination)

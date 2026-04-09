@@ -1,6 +1,6 @@
 // api.js — REST + WebSocket client para o total-map-backend
-// const API_BASE = 'http://localhost:3000';
-const API_BASE = 'https://api.totem.total.roxcode.io';
+const API_BASE = 'http://localhost:3000';
+// const API_BASE = 'https://api.totem.total.roxcode.io';
 
 export let AUTH_TOKEN = '';
 
@@ -253,14 +253,14 @@ export async function getEstablishment(pointId) {
  * Create or update the establishment for a point.
  * @param {number} pointId
  * @param {{ name: string, description?: string, opening_hours?: string }} fields
- * @param {File|null} iconFile  - optional image file (webp or svg)
+ * @param {File|null} bannerFile  - optional WebP image file for banner
  */
-export async function upsertEstablishment(pointId, fields, iconFile = null) {
+export async function upsertEstablishment(pointId, fields, bannerFile = null) {
     const form = new FormData();
     form.append('name', fields.name || '');
     if (fields.description) form.append('description', fields.description);
     if (fields.opening_hours) form.append('opening_hours', fields.opening_hours);
-    if (iconFile) form.append('icon', iconFile);
+    if (bannerFile) form.append('banner', bannerFile);
 
     const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
         method: 'PUT',

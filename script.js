@@ -354,18 +354,51 @@ window.setPointMeta = (field, value) => {
   draw();
 };
 
+// ─── Point icon (SVG) upload handler ───
+
+window.onPointIconChange = (input) => {
+  const idx = mapState.visual.editSelectedIdx;
+  if (idx === null || idx === undefined) return;
+  const pts = getPointsArray();
+  const p = pts[idx];
+  if (!p) return;
+
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const svgData = e.target.result;
+    p.map_icon_svg = svgData;
+    // Send update to backend
+    wsUpdatePoint(p.id, p.type, p.establishment_id ?? null, svgData);
+    
+    // Show preview
+    const preview = document.getElementById('pd-icon-preview');
+    if (preview && svgData.startsWith('<svg')) {
+      preview.innerHTML = svgData;
+      preview.style.display = 'block';
+    }
+    
+    syncPointDetailPanel(idx);
+    renderLists();
+    draw();
+  };
+  reader.readAsText(file);
+};
+
 // ─── Establishment panel handlers ───
 
 // Track a pending icon File selected by the user (not yet saved).
-let _pendingIconFile = null;
+let _pendingBannerFile = null;
 
-window.onEstabIconChange = (input) => {
-  _pendingIconFile = input.files[0] || null;
+window.onEstabBannerChange = (input) => {
+  _pendingBannerFile = input.files[0] || null;
   // Show a local preview immediately.
-  if (_pendingIconFile) {
-    const preview = document.getElementById('pd-estab-icon-preview');
+  if (_pendingBannerFile) {
+    const preview = document.getElementById('pd-estab-banner-preview');
     if (preview) {
-      preview.src = URL.createObjectURL(_pendingIconFile);
+      preview.src = URL.createObjectURL(_pendingBannerFile);
       preview.classList.add('visible');
     }
   }
@@ -398,11 +431,11 @@ window.saveEstablishment = async () => {
       name,
       description:   descEl?.value?.trim()  || '',
       opening_hours: hoursEl?.value?.trim() || '',
-    }, _pendingIconFile);
+    }, _pendingBannerFile);
 
     // Update local point state so establishment_id is reflected.
     if (est?.id) p.establishment_id = est.id;
-    _pendingIconFile = null;
+    _pendingBannerFile = null;
     // Refresh the file input + preview from the saved data.
     syncEstablishmentPanel(est);
     if (statusEl) statusEl.textContent = '✔ Salvo!';
@@ -442,7 +475,7 @@ async function loadEstablishmentForPoint(p) {
     syncEstablishmentPanel(null);
     return;
   }
-  _pendingIconFile = null;
+  _pendingBannerFile = null;
   // Optimistically clear while loading.
   syncEstablishmentPanel(null);
   try {
