@@ -138,6 +138,23 @@ export function connect(floorId) {
             console.log(`[WS] Disconnected (code=${evt.code}, reason=${evt.reason})`);
             stopHeartbeat();
             emit('ws:close', { code: evt.code, reason: evt.reason });
+
+            if (currentFloorId !== null) {
+                console.log('[WS] Attempting to reconnect in 3 seconds...');
+                setTimeout(async () => {
+                    const floorToReconnect = currentFloorId;
+                    if (floorToReconnect !== null) {
+                        try {
+                            await connect(floorToReconnect);
+                            console.log('[WS] Reconnected successfully. Syncing floor state...');
+                            const floorData = await getFloor(floorToReconnect);
+                            emit('floor:sync', floorData);
+                        } catch (e) {
+                            console.warn('[WS] Reconnect failed, automatically retrying...', e.message);
+                        }
+                    }
+                }, 3000);
+            }
         };
 
         ws.onmessage = (evt) => {

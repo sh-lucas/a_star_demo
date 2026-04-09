@@ -649,7 +649,16 @@ on('background:changed', (payload) => {
 on('ws:close', () => {
   stopMouseHeartbeat();
   const barStatus = document.getElementById('conn-status');
-  if (barStatus) barStatus.textContent = '⚠️ Desconectado — recarregue a página';
+  if (barStatus) barStatus.textContent = '⚠️ Conexão perdida — tentando reconectar...';
+});
+
+on('floor:sync', (floorData) => {
+  loadFloorData(floorData);
+  startMouseHeartbeat();
+  renderLists();
+  draw();
+  const barStatus = document.getElementById('conn-status');
+  if (barStatus) barStatus.textContent = `⚡ Reconectado: ${mapState.floorName} (floor #${floorData.id})`;
 });
 
 // ─── Init ───
