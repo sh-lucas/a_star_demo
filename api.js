@@ -17,6 +17,10 @@ let currentFloorId = null;
 let heartbeatTimer = null;
 const messageHandlers = {}; // event -> [callback, ...]
 
+// ─── Reconnect state ───
+let reconnectTimer = null;
+let reconnectDelay = 0; // ms; reset to 0 on successful open
+
 // Cursor remoto: conn_id -> { x, y, email, userId }
 export const remoteCursors = new Map();
 // Clientes conectados: conn_id -> info
@@ -103,11 +107,48 @@ function stopHeartbeat() {
     }
 }
 
+// ─── Reconnect scheduler ───
+function scheduleReconnect() {
+    if (currentFloorId === null) return;        // explicit disconnect — don't retry
+    if (reconnectTimer !== null) return;        // already scheduled
+
+    const delay = reconnectDelay;
+    // Exponential back-off: 0 → 1 s → 2 s → 4 s → … → 30 s max
+    reconnectDelay = delay === 0 ? 1000 : Math.min(delay * 2, 30000);
+
+    const label = delay === 0 ? 'immediately' : `in ${delay / 1000}s`;
+    console.log(`[WS] Reconnecting ${label}...`);
+
+    reconnectTimer = setTimeout(async () => {
+        reconnectTimer = null;
+        const floorToReconnect = currentFloorId;
+        if (!floorToReconnect) return;
+        try {
+            await connect(floorToReconnect);
+            // reconnectDelay reset happens in onopen; sync state here
+            console.log('[WS] Reconnected. Syncing floor state...');
+            const floorData = await getFloor(floorToReconnect);
+            emit('floor:sync', floorData);
+        } catch (e) {
+            console.warn('[WS] Reconnect attempt failed:', e.message);
+            // onclose already fired inside connect(), which called scheduleReconnect()
+            // again with increased delay — nothing more to do here.
+        }
+    }, delay);
+}
+
 // ─── WebSocket connect ───
 // Token is passed as a query param because browser WebSocket API
 // does not allow setting custom headers on the initial handshake.
 // The backend AdminAuth middleware has been patched to accept ?token= for WS upgrades.
 export function connect(floorId) {
+    // Cancel any in-flight reconnect timer so we don't end up with two
+    // concurrent reconnect attempts when the caller drives reconnection manually.
+    if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+
     return new Promise((resolve, reject) => {
         if (ws) {
             ws.close();
@@ -123,15 +164,26 @@ export function connect(floorId) {
 
         ws = new WebSocket(wsUrl);
 
+        // Whether the promise has already been settled (resolved or rejected).
+        // Prevents double-settling when onerror fires before onclose.
+        let settled = false;
+
         ws.onopen = () => {
             console.log(`[WS] Connected to floor ${floorId}`);
+            reconnectDelay = 0; // reset back-off on successful connection
+            settled = true;
             startHeartbeat();
             resolve();
         };
 
         ws.onerror = (err) => {
             console.error('[WS] Connection error:', err);
-            reject(new Error('WebSocket connection failed'));
+            // Only reject if we never got onopen (initial connection failure).
+            // For errors on an already-open socket, onclose will handle reconnect.
+            if (!settled) {
+                settled = true;
+                reject(new Error('WebSocket connection failed'));
+            }
         };
 
         ws.onclose = (evt) => {
@@ -139,22 +191,12 @@ export function connect(floorId) {
             stopHeartbeat();
             emit('ws:close', { code: evt.code, reason: evt.reason });
 
-            if (currentFloorId !== null) {
-                console.log('[WS] Attempting to reconnect in 3 seconds...');
-                setTimeout(async () => {
-                    const floorToReconnect = currentFloorId;
-                    if (floorToReconnect !== null) {
-                        try {
-                            await connect(floorToReconnect);
-                            console.log('[WS] Reconnected successfully. Syncing floor state...');
-                            const floorData = await getFloor(floorToReconnect);
-                            emit('floor:sync', floorData);
-                        } catch (e) {
-                            console.warn('[WS] Reconnect failed, automatically retrying...', e.message);
-                        }
-                    }
-                }, 3000);
+            if (!settled) {
+                settled = true;
+                reject(new Error(`WebSocket closed before opening (code=${evt.code})`));
             }
+
+            scheduleReconnect();
         };
 
         ws.onmessage = (evt) => {
@@ -210,12 +252,21 @@ export function connect(floorId) {
 }
 
 export function disconnect() {
+    // Setting currentFloorId to null first prevents scheduleReconnect()
+    // from scheduling a new attempt when onclose fires.
+    currentFloorId = null;
+
+    if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+    reconnectDelay = 0;
+
     stopHeartbeat();
     if (ws) {
         ws.close();
         ws = null;
     }
-    currentFloorId = null;
 }
 
 export function isConnected() {
