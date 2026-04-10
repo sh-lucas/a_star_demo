@@ -114,22 +114,32 @@ export function draw() {
     const type = p.type || 'path';
     const typeColor = type === 'start' ? '#66bb6a' : type === 'destination' ? '#e94560' : '#4fc3f7';
 
+    // Raio em pixels de tela — tamanho base constante mas cresce suavemente com o zoom (sqrt)
+    const baseR = (isHovered || isEditing) ? 10 : (isSelected ? 8 : 6);
+    const r = baseR * Math.sqrt(camera.zoom) / camera.zoom;
+
     ctx.beginPath();
-    ctx.arc(p.x, p.y, (isHovered || isEditing) ? 10 : (isSelected ? 8 : 6), 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
 
     ctx.fillStyle = isEditing
       ? typeColor
       : (isHovered ? '#ffcc00' : (isSelected ? '#f0a500' : (isPath ? '#e94560' : typeColor)));
     ctx.fill();
-    ctx.strokeStyle = (isHovered || isEditing) ? '#fff' : '#222';
-    ctx.lineWidth = (isHovered || isEditing) ? 2 : 1;
-    ctx.stroke();
 
+    // Pontos 'path' não têm borda (menos poluição visual)
+    if (type !== 'path' || isHovered || isEditing || isSelected) {
+      ctx.strokeStyle = (isHovered || isEditing) ? '#fff' : '#222';
+      ctx.lineWidth = ((isHovered || isEditing) ? 2 : 1) * Math.sqrt(camera.zoom) / camera.zoom;
+      ctx.stroke();
+    }
+
+    // Ícone SVG — renderizado via elemento DOM fora do canvas (não escala com zoom)
     // Label
     const label = `P${p.id}`;
     ctx.fillStyle = (isHovered || isEditing) ? '#ffcc00' : '#ddd';
-    ctx.font = (isHovered || isEditing) ? 'bold 12px monospace' : '11px monospace';
-    ctx.fillText(label, p.x + 12, p.y - 8);
+    const fontSize = ((isHovered || isEditing) ? 12 : 11) / camera.zoom;
+    ctx.font = `${(isHovered || isEditing) ? 'bold ' : ''}${fontSize}px monospace`;
+    ctx.fillText(label, p.x + (12 / camera.zoom), p.y - (8 / camera.zoom));
   }
 
   finishCanvas(ctx);

@@ -1,6 +1,14 @@
 // map.js — Estado do mapa usando IDs do banco de dados
 import { camera } from './camera.js';
 
+/** Tamanho da grade em pixels de mundo. Altere aqui para ajustar o granularity. */
+export const GRID_SIZE = 1;
+
+/** Arredonda uma coordenada de mundo para o grid mais próximo. */
+export function snapToGrid(v) {
+  return Math.round(v / GRID_SIZE) * GRID_SIZE;
+}
+
 export const mapState = {
   // Points keyed by DB id: Map<id, { id, x, y, type, establishment_id, map_icon_svg, floor_id }>
   points: new Map(),
@@ -94,8 +102,8 @@ export function loadFloorData(floorData) {
     for (const p of floorData.points) {
       mapState.points.set(p.id, {
         id: p.id,
-        x: p.x,
-        y: p.y,
+        x: snapToGrid(p.x),
+        y: snapToGrid(p.y),
         type: p.type || 'path',
         establishment_id: p.establishment_id,
         map_icon_svg: p.map_icon_svg,

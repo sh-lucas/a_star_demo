@@ -1,10 +1,10 @@
 import { camera, screenToWorld, pan, zoomAt, setZoom, handleResize } from './camera.js';
 import { runAStar } from './star.js';
-import { mapState, getPointsArray, getEdgesArray, findPointIndexById, getPointById, loadFloorData, loadSvgToImage } from './map.js';
+import { mapState, getPointsArray, getEdgesArray, findPointIndexById, getPointById, loadFloorData, loadSvgToImage, snapToGrid, GRID_SIZE } from './map.js';
 import { draw, renderLists, syncBgUI, syncPointDetailPanel, syncEstablishmentPanel, notifyCursorUpdate } from './render.js';
 import {
   setAuthToken,
-  listFloors, getFloor,
+  listFloors, getFloor, updateFloor,
   connect, disconnect, isConnected,
   wsAddPoint, wsMovePoint, wsUpdatePoint, wsRemovePoint,
   wsAddEdge, wsRemoveEdge,
@@ -54,10 +54,10 @@ window.addEventListener('keydown', e => {
     const pts = getPointsArray();
     const p = pts[mapState.visual.editSelectedIdx];
     if (!p) return;
-    if (e.code === 'ArrowUp') { p.y -= 1; wsMovePoint(p.id, p.x, p.y); }
-    else if (e.code === 'ArrowDown') { p.y += 1; wsMovePoint(p.id, p.x, p.y); }
-    else if (e.code === 'ArrowLeft') { p.x -= 1; wsMovePoint(p.id, p.x, p.y); }
-    else if (e.code === 'ArrowRight') { p.x += 1; wsMovePoint(p.id, p.x, p.y); }
+    if (e.code === 'ArrowUp') { p.y -= GRID_SIZE; wsMovePoint(p.id, p.x, p.y); }
+    else if (e.code === 'ArrowDown') { p.y += GRID_SIZE; wsMovePoint(p.id, p.x, p.y); }
+    else if (e.code === 'ArrowLeft') { p.x -= GRID_SIZE; wsMovePoint(p.id, p.x, p.y); }
+    else if (e.code === 'ArrowRight') { p.x += GRID_SIZE; wsMovePoint(p.id, p.x, p.y); }
     else if (e.code === 'Delete' || e.code === 'Backspace') {
       wsRemovePoint(p.id);
       mapState.visual.editSelectedIdx = null;
@@ -118,8 +118,8 @@ canvas.addEventListener('mousemove', e => {
     const { x, y } = screenToWorld(e.clientX, e.clientY);
     const p = getPointById(draggingPointId);
     if (p) {
-      p.x = x;
-      p.y = y;
+      p.x = snapToGrid(x);
+      p.y = snapToGrid(y);
       renderLists();
       draw();
     }
@@ -164,8 +164,9 @@ canvas.addEventListener('click', e => {
   if (panning || spaceDown || mode === 'move') return false;
   const { x, y } = screenToWorld(e.clientX, e.clientY);
   if (mode === 'point') {
-    console.log('[click] calling wsAddPoint', x, y);
-    wsAddPoint(x, y, 'path', null, null);
+    const sx = snapToGrid(x), sy = snapToGrid(y);
+    console.log('[click] calling wsAddPoint', sx, sy);
+    wsAddPoint(sx, sy, 'path', null, null);
     return false;
   }
 
@@ -272,10 +273,26 @@ function uploadBackground() {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
-      mapState.background.svgContent = ev.target.result;
+    reader.onload = async ev => {
+      const svgData = ev.target.result;
+
+      // Persist to server first; bail out on error so we don't show stale local state.
+      if (mapState.floorId == null) {
+        console.warn('[uploadBackground] No floor connected — cannot save background');
+        return;
+      }
+      try {
+        await updateFloor(mapState.floorId, mapState.floorName, svgData);
+      } catch (err) {
+        console.error('[uploadBackground] PUT /floors failed:', err.message);
+        alert(`Erro ao salvar background: ${err.message}`);
+        return;
+      }
+
+      // Update local state & UI (the WS broadcast will sync other clients).
+      mapState.background.svgContent = svgData;
       const layer = document.getElementById('bg-layer');
-      if (layer) layer.innerHTML = mapState.background.svgContent;
+      if (layer) layer.innerHTML = svgData;
       syncBgUI();
       draw();
     };

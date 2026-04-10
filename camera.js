@@ -57,7 +57,7 @@ export function pan(dx, dy) {
 
 /** Zoom centrado em um ponto de tela (sx, sy) */
 export function zoomAt(sx, sy, factor) {
-  const newZoom = Math.min(10, Math.max(0.05, camera.zoom * factor));
+  const newZoom = Math.min(12, Math.max(0.04, camera.zoom * factor));
   camera.x = sx - (sx - camera.x) * (newZoom / camera.zoom);
   camera.y = sy - (sy - camera.y) * (newZoom / camera.zoom);
   camera.zoom = newZoom;
@@ -65,7 +65,7 @@ export function zoomAt(sx, sy, factor) {
 
 /** Define o zoom absoluto, mantendo o centro da tela fixo */
 export function setZoom(value, cx, cy) {
-  const newZoom = Math.min(10, Math.max(0.05, value));
+  const newZoom = Math.min(12, Math.max(0.04, value));
   camera.x = cx - (cx - camera.x) * (newZoom / camera.zoom);
   camera.y = cy - (cy - camera.y) * (newZoom / camera.zoom);
   camera.zoom = newZoom;
