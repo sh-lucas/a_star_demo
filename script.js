@@ -10,6 +10,7 @@ import {
   wsAddEdge, wsRemoveEdge,
   sendMousePosition,
   getEstablishment, upsertEstablishment, deleteEstablishment as apiDeleteEstablishment,
+  searchPoints,
   on, off,
   remoteCursors
 } from './api.js';
@@ -44,6 +45,17 @@ handleResize(canvas, draw);
 // ─── Keyboard ───
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+  // T → toggle search overlay
+  if (e.key === 't' || e.key === 'T') {
+    if (searchOverlay.classList.contains('visible')) {
+      closeSearch();
+    } else {
+      openSearch();
+    }
+    e.preventDefault();
+    return;
+  }
 
   if (e.code === 'Space' && !e.repeat) {
     spaceDown = true;
@@ -234,6 +246,86 @@ function stopMouseHeartbeat() {
     heartbeatFallbackTimer = null;
   }
 }
+
+// ─── Search overlay ───
+const searchOverlay = document.getElementById('search-overlay');
+const searchInput   = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+
+let searchDebounceTimer = null;
+
+function openSearch() {
+  searchOverlay.classList.add('visible');
+  searchInput.value = '';
+  searchResults.innerHTML = '';
+  searchInput.focus();
+}
+
+function closeSearch() {
+  searchOverlay.classList.remove('visible');
+  searchInput.value = '';
+  searchResults.innerHTML = '';
+}
+
+function centerOnPoint(point) {
+  const canvas = document.getElementById('canvas');
+  // Pan the camera so the point sits at the center of the canvas.
+  camera.x = canvas.width  / 2 - point.x * camera.zoom;
+  camera.y = canvas.height / 2 - point.y * camera.zoom;
+  closeSearch();
+  draw();
+}
+
+async function runSearch(q) {
+  if (!q.trim()) { searchResults.innerHTML = ''; return; }
+  searchResults.innerHTML = '<div id="search-empty">Buscando...</div>';
+  try {
+    const data = await searchPoints(q, { limit: 30 });
+    const items = data?.results ?? [];
+    if (!items.length) {
+      searchResults.innerHTML = '<div id="search-empty">Nenhum resultado encontrado.</div>';
+      return;
+    }
+    searchResults.innerHTML = items.map(r => {
+      const floor = r.floor_id != null ? `Andar ${r.floor_id}` : '';
+      return `<div class="search-result-item" data-point-id="${r.point_id}"
+                   data-x="${r.x}" data-y="${r.y}">
+        <span class="search-result-name">${escapeHtml(r.establishment_name)}</span>
+        <span class="search-result-floor">${escapeHtml(floor)}</span>
+      </div>`;
+    }).join('');
+
+    searchResults.querySelectorAll('.search-result-item').forEach(el => {
+      el.addEventListener('click', () => {
+        centerOnPoint({ x: parseFloat(el.dataset.x), y: parseFloat(el.dataset.y) });
+      });
+    });
+  } catch (err) {
+    searchResults.innerHTML = `<div id="search-empty" style="color:#e94560">Erro: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => runSearch(searchInput.value), 300);
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeSearch(); }
+  if (e.key === 'Enter') {
+    clearTimeout(searchDebounceTimer);
+    runSearch(searchInput.value);
+  }
+});
+
+// Click outside the search box closes it.
+searchOverlay.addEventListener('mousedown', e => {
+  if (e.target === searchOverlay) closeSearch();
+});
 
 // ─── Mode ───
 function setMode(m) {

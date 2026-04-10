@@ -343,7 +343,79 @@
     .type-dot.start { background: #66bb6a; }
     .type-dot.destination { background: #e94560; }
 
-    /* ---- Connection Status Bar ---- */
+    /* ---- Search overlay ---- */
+    #search-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 30, 0.75);
+      z-index: 50;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 10vh;
+    }
+    #search-overlay.visible { display: flex; }
+    #search-box {
+      background: #16213e;
+      border: 1px solid #444;
+      border-radius: 8px;
+      width: 480px;
+      max-width: 92vw;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #search-input-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      gap: 8px;
+      border-bottom: 1px solid #2a2a4a;
+    }
+    #search-input-row span { font-size: 14px; color: #888; }
+    #search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font: inherit;
+      font-size: 14px;
+    }
+    #search-input::placeholder { color: #555; }
+    #search-kbd {
+      font-size: 10px;
+      color: #555;
+      background: #0f172a;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+    #search-results {
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .search-result-item {
+      padding: 9px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #1a1a32;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: #0f3460; }
+    .search-result-name { font-size: 13px; color: #ddd; }
+    .search-result-floor { font-size: 11px; color: #666; flex-shrink: 0; }
+    #search-empty {
+      padding: 16px;
+      font-size: 12px;
+      color: #555;
+      text-align: center;
+      font-style: italic;
+    }
     #conn-status {
       position: fixed;
       bottom: 0;
@@ -536,6 +608,18 @@
                 onclick="window.deleteEstablishment(); return false;">🗑</button>
       </div>
       <div id="pd-estab-status" style="font-size:10px;color:#888;text-align:center;min-height:14px;"></div>
+    </div>
+  </div>
+
+  <!-- Search overlay (toggle with T) -->
+  <div id="search-overlay">
+    <div id="search-box">
+      <div id="search-input-row">
+        <span>🔍</span>
+        <input id="search-input" type="text" placeholder="Buscar estabelecimento..." autocomplete="off" spellcheck="false">
+        <span id="search-kbd">ESC para fechar</span>
+      </div>
+      <div id="search-results"></div>
     </div>
   </div>
 

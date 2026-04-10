@@ -358,4 +358,18 @@ export async function deleteEstablishment(pointId) {
     return null;
 }
 
+/**
+ * Full-text search on destination points via establishments.
+ * @param {string} q — search term
+ * @param {{ floor_id?: number, category_id?: number, limit?: number, offset?: number }} opts
+ */
+export async function searchPoints(q, opts = {}) {
+    const params = new URLSearchParams({ q });
+    if (opts.floor_id)    params.set('floor_id',    opts.floor_id);
+    if (opts.category_id) params.set('category_id', opts.category_id);
+    if (opts.limit)       params.set('limit',        opts.limit);
+    if (opts.offset)      params.set('offset',       opts.offset);
+    return apiFetch(`/search?${params}`);
+}
+
 export { API_BASE };
