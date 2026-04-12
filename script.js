@@ -12,7 +12,8 @@ import {
   getEstablishment, upsertEstablishment, deleteEstablishment as apiDeleteEstablishment,
   searchPoints,
   on, off,
-  remoteCursors
+  remoteCursors,
+  API_BASE,
 } from './api.js';
 
 
@@ -640,6 +641,8 @@ async function selectFloor(id) {
     renderLists();
     draw();
     if (barStatus) barStatus.textContent = `⚡ Conectado: ${mapState.floorName} (floor #${id})`;
+    const dlBtn = document.getElementById('btn-download-map');
+    if (dlBtn) dlBtn.disabled = false;
   } catch (err) {
     overlayStatus.textContent = `Erro: ${err.message}`;
     if (barStatus) barStatus.textContent = `Erro: ${err.message}`;
@@ -772,3 +775,31 @@ on('floor:sync', (floorData) => {
 
 // ─── Init ───
 // Nada automático — o usuário cola o token e clica em Conectar.
+
+// ─── Download floor map ───
+window.downloadFloorMap = async function () {
+  const floorId = mapState.floorId;
+  if (!floorId) return;
+
+  const btn = document.getElementById('btn-download-map');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/maps/floor/${floorId}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `floor-${floorId}.db`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(`Erro ao baixar mapa: ${err.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
