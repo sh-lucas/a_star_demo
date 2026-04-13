@@ -113,6 +113,7 @@ canvas.addEventListener('mousedown', e => {
     if (idx !== null) {
       draggingPointId = getPointsArray()[idx].id;
       mapState.visual.editSelectedIdx = idx;
+      _establishmentDirty = false;
       syncPointDetailPanel(idx);
       loadEstablishmentForPoint(getPointsArray()[idx]);
       updateCursor();
@@ -187,7 +188,10 @@ canvas.addEventListener('click', e => {
   if (mode === 'edit') {
     mapState.visual.editSelectedIdx = idx;
     syncPointDetailPanel(idx);
-    if (idx !== null) loadEstablishmentForPoint(getPointsArray()[idx]);
+    if (idx !== null) {
+      _establishmentDirty = false;
+      loadEstablishmentForPoint(getPointsArray()[idx]);
+    }
     draw();
     return false;
   }
@@ -501,9 +505,13 @@ window.onPointIconChange = (input) => {
 
 // Track a pending icon File selected by the user (not yet saved).
 let _pendingBannerFile = null;
+// True while the user has unsaved edits in the establishment fields.
+// Prevents background reloads (floor:sync) from wiping what they typed.
+let _establishmentDirty = false;
 
 window.onEstabBannerChange = (input) => {
   _pendingBannerFile = input.files[0] || null;
+  _establishmentDirty = true;
   // Show a local preview immediately.
   if (_pendingBannerFile) {
     const preview = document.getElementById('pd-estab-banner-preview');
@@ -513,6 +521,9 @@ window.onEstabBannerChange = (input) => {
     }
   }
 };
+
+// Mark establishment fields as dirty when the user types.
+window.markEstabDirty = () => { _establishmentDirty = true; };
 
 window.saveEstablishment = async () => {
   const idx = mapState.visual.editSelectedIdx;
@@ -548,6 +559,7 @@ window.saveEstablishment = async () => {
     // Update local point state so establishment_id is reflected.
     if (est?.id) p.establishment_id = est.id;
     _pendingBannerFile = null;
+    _establishmentDirty = false;
     // Refresh the file input + preview from the saved data.
     syncEstablishmentPanel(est);
     if (statusEl) statusEl.textContent = '✔ Salvo!';
@@ -573,6 +585,8 @@ window.deleteEstablishment = async () => {
     await apiDeleteEstablishment(p.id);
     p.establishment_id = null;
     _pendingIconFile = null;
+    _pendingBannerFile = null;
+    _establishmentDirty = false;
     syncEstablishmentPanel(null);
     if (statusEl) statusEl.textContent = '✔ Removido';
     setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 2000);
@@ -585,14 +599,22 @@ window.deleteEstablishment = async () => {
 async function loadEstablishmentForPoint(p) {
   if (!p || p.type !== 'destination') {
     syncEstablishmentPanel(null);
+    _establishmentDirty = false;
     return;
   }
+
+  // If the user already typed something, keep their edits — don't overwrite.
+  if (_establishmentDirty) return;
+
   _pendingBannerFile = null;
   // Optimistically clear while loading.
   syncEstablishmentPanel(null);
   try {
     const est = await getEstablishment(p.id);
-    syncEstablishmentPanel(est); // est may be null (no establishment yet)
+    // Guard: user may have started typing while we were fetching — respect that.
+    if (!_establishmentDirty) {
+      syncEstablishmentPanel(est); // est may be null (no establishment yet)
+    }
   } catch (err) {
     console.warn('[establishment] failed to load:', err.message);
   }
@@ -767,10 +789,32 @@ on('ws:close', () => {
 });
 
 on('floor:sync', (floorData) => {
+  // Remember which point was selected (by ID, not array index — index may shift after reload).
+  const prevSelectedId = mapState.visual.editSelectedIdx !== null
+    ? (getPointsArray()[mapState.visual.editSelectedIdx]?.id ?? null)
+    : null;
+
   loadFloorData(floorData);
   startMouseHeartbeat();
   renderLists();
   draw();
+
+  // Restore selection if the point still exists after reload.
+  if (prevSelectedId !== null) {
+    const pts = getPointsArray();
+    const newIdx = pts.findIndex(p => p.id === prevSelectedId);
+    if (newIdx !== -1) {
+      mapState.visual.editSelectedIdx = newIdx;
+      syncPointDetailPanel(newIdx);
+      // Don't clobber fields the user may be editing — loadEstablishment
+      // only fetches when the panel was NOT already dirty.
+      loadEstablishmentForPoint(pts[newIdx]);
+    } else {
+      mapState.visual.editSelectedIdx = null;
+      syncPointDetailPanel(null);
+    }
+  }
+
   const barStatus = document.getElementById('conn-status');
   if (barStatus) barStatus.textContent = `⚡ Reconectado: ${mapState.floorName} (floor #${floorData.id})`;
 });

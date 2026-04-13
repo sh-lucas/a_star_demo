@@ -300,13 +300,11 @@ export function syncPointDetailPanel(idx) {
   if (meta) meta.classList.toggle('visible', hasMeta);
 
   if (hasMeta) {
-    const title = document.getElementById('pd-title');
     const iconFile = document.getElementById('pd-icon-file');
     const iconPreview = document.getElementById('pd-icon-preview');
-    
-    if (title) title.value = p.title || '';
+
     if (iconFile) iconFile.value = '';
-    
+
     // Show SVG preview if available
     if (iconPreview) {
       if (p.map_icon_svg && p.map_icon_svg.startsWith('<svg')) {
