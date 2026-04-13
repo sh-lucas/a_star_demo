@@ -9,7 +9,7 @@ import {
   wsAddPoint, wsMovePoint, wsUpdatePoint, wsRemovePoint,
   wsAddEdge, wsRemoveEdge,
   sendMousePosition,
-  getEstablishment, upsertEstablishment, deleteEstablishment as apiDeleteEstablishment,
+  getEstablishment, upsertEstablishment, upsertEstablishmentBanner, deleteEstablishment as apiDeleteEstablishment,
   searchPoints,
   on, off,
   remoteCursors,
@@ -528,20 +528,22 @@ window.saveEstablishment = async () => {
   const saveBtn  = document.getElementById('pd-estab-save');
 
   const name = nameEl?.value?.trim() || '';
-  if (!name) {
-    if (statusEl) statusEl.textContent = '⚠️ Nome é obrigatório';
-    return;
-  }
 
   if (saveBtn) saveBtn.disabled = true;
   if (statusEl) statusEl.textContent = 'Salvando...';
 
   try {
-    const est = await upsertEstablishment(p.id, {
+    // Upsert text fields (all optional on the backend now).
+    let est = await upsertEstablishment(p.id, {
       name,
       description:   descEl?.value?.trim()  || '',
       opening_hours: hoursEl?.value?.trim() || '',
-    }, _pendingBannerFile);
+    });
+
+    // Upload banner separately if a new file was selected.
+    if (_pendingBannerFile) {
+      est = await upsertEstablishmentBanner(p.id, _pendingBannerFile);
+    }
 
     // Update local point state so establishment_id is reflected.
     if (est?.id) p.establishment_id = est.id;

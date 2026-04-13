@@ -319,18 +319,41 @@ export async function getEstablishment(pointId) {
 
 /**
  * Create or update the establishment for a point.
+ * All text fields are optional. Returns null when the server responds 204
+ * (no text fields were sent and no establishment exists yet — no-op).
  * @param {number} pointId
- * @param {{ name: string, description?: string, opening_hours?: string }} fields
- * @param {File|null} bannerFile  - optional WebP image file for banner
+ * @param {{ name?: string, description?: string, opening_hours?: string }} fields
  */
-export async function upsertEstablishment(pointId, fields, bannerFile = null) {
+export async function upsertEstablishment(pointId, fields) {
     const form = new FormData();
-    form.append('name', fields.name || '');
-    if (fields.description) form.append('description', fields.description);
+    if (fields.name)          form.append('name',          fields.name);
+    if (fields.description)   form.append('description',   fields.description);
     if (fields.opening_hours) form.append('opening_hours', fields.opening_hours);
-    if (bannerFile) form.append('banner', bannerFile);
 
     const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
+        body: form,
+    });
+    if (res.status === 204) return null;
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
+/**
+ * Upload or replace the banner image for an existing establishment.
+ * The establishment must already exist (call upsertEstablishment first).
+ * @param {number} pointId
+ * @param {File} bannerFile  - WebP image file
+ */
+export async function upsertEstablishmentBanner(pointId, bannerFile) {
+    const form = new FormData();
+    form.append('banner', bannerFile);
+
+    const res = await fetch(`${API_BASE}/points/${pointId}/establishment/banner`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
         body: form,
