@@ -10,6 +10,7 @@ import {
   wsAddEdge, wsRemoveEdge,
   sendMousePosition,
   getEstablishment, upsertEstablishment, upsertEstablishmentBanner, deleteEstablishment as apiDeleteEstablishment,
+  upsertPointMapIcon,
   searchPoints,
   on, off,
   remoteCursors,
@@ -452,7 +453,7 @@ window.setPointType = (type) => {
   if (!p) return;
   p.type = type;
   if (type === 'path') { delete p.title; delete p.description; delete p.icon; }
-  wsUpdatePoint(p.id, type, p.establishment_id ?? null, p.map_icon_svg ?? null);
+  wsUpdatePoint(p.id, type, p.establishment_id ?? null);
   syncPointDetailPanel(idx);
   loadEstablishmentForPoint(p);
   renderLists();
@@ -468,9 +469,9 @@ window.setPointMeta = (field, value) => {
   draw();
 };
 
-// ─── Point icon (SVG) upload handler ───
+// ─── Point icon (SVG/WebP) upload handler ───
 
-window.onPointIconChange = (input) => {
+window.onPointIconChange = async (input) => {
   const idx = mapState.visual.editSelectedIdx;
   if (idx === null || idx === undefined) return;
   const pts = getPointsArray();
@@ -480,25 +481,17 @@ window.onPointIconChange = (input) => {
   const file = input.files[0];
   if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const svgData = e.target.result;
-    p.map_icon_svg = svgData;
-    // Send update to backend
-    wsUpdatePoint(p.id, p.type, p.establishment_id ?? null, svgData);
-    
-    // Show preview
-    const preview = document.getElementById('pd-icon-preview');
-    if (preview && svgData.startsWith('<svg')) {
-      preview.innerHTML = svgData;
-      preview.style.display = 'block';
-    }
-    
+  try {
+    const updated = await upsertPointMapIcon(p.id, file);
+    // Update local state with the values returned by the server
+    p.map_icon_type = updated.map_icon_type ?? null;
+    p.map_icon_data = updated.map_icon_data ?? null;
     syncPointDetailPanel(idx);
     renderLists();
     draw();
-  };
-  reader.readAsText(file);
+  } catch (err) {
+    alert(`Erro ao salvar ícone: ${err.message}`);
+  }
 };
 
 // ─── Establishment panel handlers ───
@@ -702,7 +695,8 @@ on('point:added', (payload) => {
     y: payload.y,
     type: payload.type || 'path',
     establishment_id: payload.establishment_id,
-    map_icon_svg: payload.map_icon_svg,
+    map_icon_type: payload.map_icon_type ?? null,
+    map_icon_data: payload.map_icon_data ?? null,
     floor_id: payload.floor_id
   });
   console.log('[point:added] before renderLists');
@@ -727,7 +721,8 @@ on('point:updated', (payload) => {
   if (p) {
     p.type = payload.type;
     p.establishment_id = payload.establishment_id;
-    p.map_icon_svg = payload.map_icon_svg;
+    p.map_icon_type = payload.map_icon_type ?? null;
+    p.map_icon_data = payload.map_icon_data ?? null;
   }
   renderLists();
   draw();

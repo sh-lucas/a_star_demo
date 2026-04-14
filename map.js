@@ -10,7 +10,7 @@ export function snapToGrid(v) {
 }
 
 export const mapState = {
-  // Points keyed by DB id: Map<id, { id, x, y, type, establishment_id, map_icon_svg, floor_id }>
+  // Points keyed by DB id: Map<id, { id, x, y, type, establishment_id, map_icon_type, map_icon_data, floor_id }>
   points: new Map(),
   // Edges keyed by DB id: Map<id, { id, from_point_id, to_point_id, group_id }>
   edges: new Map(),
@@ -89,6 +89,26 @@ export function loadSvgToImage(svgString, callback) {
 }
 
 /**
+ * Carrega o ícone de mapa de um point em um HTMLImageElement.
+ * Aceita map_icon_type ('svg' | 'webp') e map_icon_data (base64).
+ * Chama callback(img) com null se não houver ícone ou em caso de erro.
+ */
+export function loadMapIconToImage(iconType, iconDataBase64, callback) {
+  if (!iconType || !iconDataBase64) { callback(null); return; }
+  const mimeType = iconType === 'svg' ? 'image/svg+xml' : 'image/webp';
+  // Decodifica base64 → Uint8Array → Blob
+  const binary = atob(iconDataBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => { URL.revokeObjectURL(url); callback(img); };
+  img.onerror = () => { URL.revokeObjectURL(url); callback(null); };
+  img.src = url;
+}
+
+/**
  * Carrega os dados de um floor via resposta da API e popula o mapState.
  * Expected floorData: { id, name, background_svg, points: [...], edges: [...] }
  */
@@ -106,7 +126,8 @@ export function loadFloorData(floorData) {
         y: snapToGrid(p.y),
         type: p.type || 'path',
         establishment_id: p.establishment_id,
-        map_icon_svg: p.map_icon_svg,
+        map_icon_type: p.map_icon_type ?? null,
+        map_icon_data: p.map_icon_data ?? null,
         floor_id: p.floor_id
       });
     }

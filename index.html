@@ -583,10 +583,10 @@
     </div>
      <div class="pd-meta" id="pd-meta">
       <div class="pd-row" style="align-items:flex-start;gap:8px;">
-        <label style="padding-top:4px;">Ícone SVG</label>
+        <label style="padding-top:4px;">Ícone</label>
         <div style="display:flex;flex-direction:column;gap:4px;flex:1">
-          <svg id="pd-icon-preview" style="max-width:48px;max-height:48px;border:1px solid #333;border-radius:4px;display:none;"></svg>
-          <input type="file" id="pd-icon-file" accept=".svg,image/svg+xml"
+          <div id="pd-icon-preview" style="display:none;"></div>
+          <input type="file" id="pd-icon-file" accept=".svg,image/svg+xml,.webp,image/webp"
                  onchange="window.onPointIconChange(this); return false;">
         </div>
       </div>

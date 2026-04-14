@@ -1,5 +1,5 @@
 import { camera, prepareCanvas, finishCanvas, worldToScreen } from './camera.js';
-import { mapState, getPointsArray, getEdgesArray } from './map.js';
+import { mapState, getPointsArray, getEdgesArray, loadMapIconToImage } from './map.js';
 import { remoteCursors } from './api.js';
 
 const canvas = document.getElementById('canvas');
@@ -23,7 +23,6 @@ function getSmoothed(connId, targetX, targetY) {
   return { x, y };
 }
 
-// Continuous rAF loop while any remote cursor is visible, so lerp animates
 // between position updates instead of only on the frames draw() is called.
 let rafLoopId = null;
 
@@ -133,7 +132,6 @@ export function draw() {
       ctx.stroke();
     }
 
-    // Ícone SVG — renderizado via elemento DOM fora do canvas (não escala com zoom)
     // Label
     const label = `P${p.id}`;
     ctx.fillStyle = (isHovered || isEditing) ? '#ffcc00' : '#ddd';
@@ -305,10 +303,16 @@ export function syncPointDetailPanel(idx) {
 
     if (iconFile) iconFile.value = '';
 
-    // Show SVG preview if available
+    // Show icon preview if available
     if (iconPreview) {
-      if (p.map_icon_svg && p.map_icon_svg.startsWith('<svg')) {
-        iconPreview.innerHTML = p.map_icon_svg;
+      if (p.map_icon_type && p.map_icon_data) {
+        const mimeType = p.map_icon_type === 'svg' ? 'image/svg+xml' : 'image/webp';
+        iconPreview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = `data:${mimeType};base64,${p.map_icon_data}`;
+        img.style.width = '32px';
+        img.style.height = '32px';
+        iconPreview.appendChild(img);
         iconPreview.style.display = 'block';
       } else {
         iconPreview.innerHTML = '';

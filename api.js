@@ -274,16 +274,16 @@ export function isConnected() {
 }
 
 // ─── WebSocket CRUD operations ───
-export function wsAddPoint(x, y, type = 'path', establishmentId = null, mapIconSvg = null) {
-    send('point:add', { x, y, type, establishment_id: establishmentId, map_icon_svg: mapIconSvg });
+export function wsAddPoint(x, y, type = 'path', establishmentId = null) {
+    send('point:add', { x, y, type, establishment_id: establishmentId });
 }
 
 export function wsMovePoint(id, x, y) {
     send('point:move', { id, x, y });
 }
 
-export function wsUpdatePoint(id, type, establishmentId = null, mapIconSvg = null) {
-    send('point:update', { id, type, establishment_id: establishmentId, map_icon_svg: mapIconSvg });
+export function wsUpdatePoint(id, type, establishmentId = null) {
+    send('point:update', { id, type, establishment_id: establishmentId });
 }
 
 export function wsRemovePoint(id) {
@@ -379,6 +379,27 @@ export async function deleteEstablishment(pointId) {
         throw new Error(data.message || `HTTP ${res.status}`);
     }
     return null;
+}
+
+/**
+ * Upload or replace the map icon for a point.
+ * @param {number} pointId
+ * @param {File} iconFile  - WebP or SVG file
+ */
+export async function upsertPointMapIcon(pointId, iconFile) {
+    const form = new FormData();
+    form.append('icon', iconFile);
+
+    const res = await fetch(`${API_BASE}/points/${pointId}/map-icon`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
+        body: form,
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || `HTTP ${res.status}`);
+    }
+    return res.json();
 }
 
 /**
