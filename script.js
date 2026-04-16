@@ -411,74 +411,9 @@ function clearBackground() {
 }
 
 function updateBgParam(param, value) {
-  if (param === 'ox') mapState.background.offsetX = parseFloat(value) || 0;
-  else if (param === 'oy') mapState.background.offsetY = parseFloat(value) || 0;
-  else if (param === 'sx') {
-    mapState.background.scaleX = parseFloat(value) || 1.0;
-    const num = document.getElementById('bg-sx-num');
-    if (num && document.activeElement !== num) num.value = mapState.background.scaleX.toFixed(4);
-  } else if (param === 'sy') {
-    mapState.background.scaleY = parseFloat(value) || 1.0;
-    const num = document.getElementById('bg-sy-num');
-    if (num && document.activeElement !== num) num.value = mapState.background.scaleY.toFixed(4);
-  }
-  // sync displayed values
-  const sxVal = document.getElementById('bg-sx-val');
-  const syVal = document.getElementById('bg-sy-val');
-  if (sxVal) sxVal.textContent = (mapState.background.scaleX ?? 1.0).toFixed(3) + '×';
-  if (syVal) syVal.textContent = (mapState.background.scaleY ?? 1.0).toFixed(3) + '×';
+  if (param === 'ox') mapState.background.offsetX = parseInt(value) || 0;
+  else if (param === 'oy') mapState.background.offsetY = parseInt(value) || 0;
   draw();
-}
-
-async function applyTransformToPoints() {
-  const sx = mapState.background.scaleX ?? 1.0;
-  const sy = mapState.background.scaleY ?? 1.0;
-  const ox = mapState.background.offsetX ?? 0;
-  const oy = mapState.background.offsetY ?? 0;
-
-  const pts = getPointsArray();
-  if (!pts.length) { alert('Nenhum ponto carregado.'); return; }
-
-  const confirm = window.confirm(
-    `Isso vai mover TODOS os ${pts.length} pontos do floor aplicando:\n` +
-    `  Scale X: ${sx.toFixed(4)}, Scale Y: ${sy.toFixed(4)}\n` +
-    `  Offset X: ${ox}, Offset Y: ${oy}\n\n` +
-    `Fórmula: new_x = old_x * scaleX + offsetX\n\n` +
-    `Essa operação é IRREVERSÍVEL via este painel. Confirmar?`
-  );
-  if (!confirm) return;
-
-  const btn = document.getElementById('bg-apply-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Aplicando...'; }
-
-  let done = 0;
-  for (const p of pts) {
-    const nx = p.x * sx + ox;
-    const ny = p.y * sy + oy;
-    // Update local state immediately so canvas reflects change
-    p.x = nx;
-    p.y = ny;
-    wsMovePoint(p.id, nx, ny);
-    done++;
-    if (done % 20 === 0) {
-      // Yield to let WS queue drain and update UI
-      await new Promise(r => setTimeout(r, 10));
-      draw();
-    }
-  }
-
-  // After applying, reset the transform so the background lines up with points at 1:1
-  mapState.background.offsetX = 0;
-  mapState.background.offsetY = 0;
-  mapState.background.scaleX = 1.0;
-  mapState.background.scaleY = 1.0;
-
-  draw();
-  syncBgUI();
-  if (btn) { btn.disabled = false; btn.textContent = `✅ Aplicado (${done} pts)`; }
-  setTimeout(() => {
-    if (btn) btn.textContent = '🎯 Aplicar aos Pontos';
-  }, 3000);
 }
 
 function updateMapZoom(value) {
@@ -491,50 +426,6 @@ function updateMapZoom(value) {
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-
-  const bgPanelOpen = document.getElementById('bg-panel')?.classList.contains('open');
-
-  if (bgPanelOpen && e.ctrlKey) {
-    // ── Pinch gesture (Ctrl+scroll on trackpad) → adjust background scale ──
-    // deltaY is small (-1 to -5 for gentle pinch), positive = pinch in (shrink)
-    const sensitivity = 0.008;
-    const factor = 1 - e.deltaY * sensitivity;
-    const newSx = Math.max(0.1, Math.min(5, (mapState.background.scaleX ?? 1) * factor));
-    const newSy = Math.max(0.1, Math.min(5, (mapState.background.scaleY ?? 1) * factor));
-    mapState.background.scaleX = newSx;
-    mapState.background.scaleY = newSy;
-    // Sync sliders + number inputs + labels
-    const sxSlider = document.getElementById('bg-sx');
-    const sySlider = document.getElementById('bg-sy');
-    const sxNum    = document.getElementById('bg-sx-num');
-    const syNum    = document.getElementById('bg-sy-num');
-    const sxVal    = document.getElementById('bg-sx-val');
-    const syVal    = document.getElementById('bg-sy-val');
-    if (sxSlider) sxSlider.value = newSx;
-    if (sySlider) sySlider.value = newSy;
-    if (sxNum)    sxNum.value    = newSx.toFixed(4);
-    if (syNum)    syNum.value    = newSy.toFixed(4);
-    if (sxVal)    sxVal.textContent = newSx.toFixed(3) + '×';
-    if (syVal)    syVal.textContent = newSy.toFixed(3) + '×';
-    draw();
-    return;
-  }
-
-  if (bgPanelOpen && !e.ctrlKey) {
-    // ── Two-finger scroll on trackpad → pan background offset ──
-    // Divide by camera.zoom so speed feels consistent at any zoom level.
-    const zoom = camera.zoom || 1;
-    mapState.background.offsetX -= e.deltaX / zoom;
-    mapState.background.offsetY -= e.deltaY / zoom;
-    const oxInput = document.getElementById('bg-ox');
-    const oyInput = document.getElementById('bg-oy');
-    if (oxInput) oxInput.value = Math.round(mapState.background.offsetX);
-    if (oyInput) oyInput.value = Math.round(mapState.background.offsetY);
-    draw();
-    return;
-  }
-
-  // ── Default: zoom camera ──
   zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.1 : 1 / 1.1);
   const slider = document.getElementById('map-zoom');
   if (slider) slider.value = camera.zoom;
@@ -553,7 +444,6 @@ window.toggleBgPanel = () => document.getElementById('bg-panel').classList.toggl
 window.uploadBackground = uploadBackground;
 window.clearBackground = clearBackground;
 window.updateBgParam = updateBgParam;
-window.applyTransformToPoints = applyTransformToPoints;
 window.updateMapZoom = updateMapZoom;
 window.setPointType = (type) => {
   const idx = mapState.visual.editSelectedIdx;

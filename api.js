@@ -326,8 +326,8 @@ export async function getEstablishment(pointId) {
  */
 export async function upsertEstablishment(pointId, fields) {
     const form = new FormData();
-    if (fields.name) form.append('name', fields.name);
-    if (fields.description) form.append('description', fields.description);
+    if (fields.name)          form.append('name',          fields.name);
+    if (fields.description)   form.append('description',   fields.description);
     if (fields.opening_hours) form.append('opening_hours', fields.opening_hours);
 
     const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
@@ -409,10 +409,10 @@ export async function upsertPointMapIcon(pointId, iconFile) {
  */
 export async function searchPoints(q, opts = {}) {
     const params = new URLSearchParams({ q });
-    if (opts.floor_id) params.set('floor_id', opts.floor_id);
+    if (opts.floor_id)    params.set('floor_id',    opts.floor_id);
     if (opts.category_id) params.set('category_id', opts.category_id);
-    if (opts.limit) params.set('limit', opts.limit);
-    if (opts.offset) params.set('offset', opts.offset);
+    if (opts.limit)       params.set('limit',        opts.limit);
+    if (opts.offset)      params.set('offset',       opts.offset);
     return apiFetch(`/search?${params}`);
 }
 
