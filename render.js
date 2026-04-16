@@ -57,10 +57,12 @@ export function syncBGLayer() {
   }
 
   const zoom = camera.zoom;
+  const sx = (mapState.background.scaleX ?? 1.0) * zoom;
+  const sy = (mapState.background.scaleY ?? 1.0) * zoom;
   const tx = camera.x + (mapState.background.offsetX * zoom);
   const ty = camera.y + (mapState.background.offsetY * zoom);
 
-  layer.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
+  layer.style.transform = `translate(${tx}px, ${ty}px) scale(${sx}, ${sy})`;
 }
 
 export function draw() {
@@ -228,8 +230,16 @@ export function syncBgUI() {
 
   const oxInput = document.getElementById('bg-ox');
   const oyInput = document.getElementById('bg-oy');
+  const sxInput = document.getElementById('bg-sx');
+  const syInput = document.getElementById('bg-sy');
+  const sxVal   = document.getElementById('bg-sx-val');
+  const syVal   = document.getElementById('bg-sy-val');
   if (oxInput) oxInput.value = Math.round(mapState.background.offsetX);
   if (oyInput) oyInput.value = Math.round(mapState.background.offsetY);
+  if (sxInput) sxInput.value = (mapState.background.scaleX ?? 1.0).toFixed(4);
+  if (syInput) syInput.value = (mapState.background.scaleY ?? 1.0).toFixed(4);
+  if (sxVal)   sxVal.textContent  = (mapState.background.scaleX ?? 1.0).toFixed(3) + '×';
+  if (syVal)   syVal.textContent  = (mapState.background.scaleY ?? 1.0).toFixed(3) + '×';
 }
 
 /**

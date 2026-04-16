@@ -411,9 +411,74 @@ function clearBackground() {
 }
 
 function updateBgParam(param, value) {
-  if (param === 'ox') mapState.background.offsetX = parseInt(value) || 0;
-  else if (param === 'oy') mapState.background.offsetY = parseInt(value) || 0;
+  if (param === 'ox') mapState.background.offsetX = parseFloat(value) || 0;
+  else if (param === 'oy') mapState.background.offsetY = parseFloat(value) || 0;
+  else if (param === 'sx') {
+    mapState.background.scaleX = parseFloat(value) || 1.0;
+    const num = document.getElementById('bg-sx-num');
+    if (num && document.activeElement !== num) num.value = mapState.background.scaleX.toFixed(4);
+  } else if (param === 'sy') {
+    mapState.background.scaleY = parseFloat(value) || 1.0;
+    const num = document.getElementById('bg-sy-num');
+    if (num && document.activeElement !== num) num.value = mapState.background.scaleY.toFixed(4);
+  }
+  // sync displayed values
+  const sxVal = document.getElementById('bg-sx-val');
+  const syVal = document.getElementById('bg-sy-val');
+  if (sxVal) sxVal.textContent = (mapState.background.scaleX ?? 1.0).toFixed(3) + '×';
+  if (syVal) syVal.textContent = (mapState.background.scaleY ?? 1.0).toFixed(3) + '×';
   draw();
+}
+
+async function applyTransformToPoints() {
+  const sx = mapState.background.scaleX ?? 1.0;
+  const sy = mapState.background.scaleY ?? 1.0;
+  const ox = mapState.background.offsetX ?? 0;
+  const oy = mapState.background.offsetY ?? 0;
+
+  const pts = getPointsArray();
+  if (!pts.length) { alert('Nenhum ponto carregado.'); return; }
+
+  const confirm = window.confirm(
+    `Isso vai mover TODOS os ${pts.length} pontos do floor aplicando:\n` +
+    `  Scale X: ${sx.toFixed(4)}, Scale Y: ${sy.toFixed(4)}\n` +
+    `  Offset X: ${ox}, Offset Y: ${oy}\n\n` +
+    `Fórmula: new_x = old_x * scaleX + offsetX\n\n` +
+    `Essa operação é IRREVERSÍVEL via este painel. Confirmar?`
+  );
+  if (!confirm) return;
+
+  const btn = document.getElementById('bg-apply-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Aplicando...'; }
+
+  let done = 0;
+  for (const p of pts) {
+    const nx = p.x * sx + ox;
+    const ny = p.y * sy + oy;
+    // Update local state immediately so canvas reflects change
+    p.x = nx;
+    p.y = ny;
+    wsMovePoint(p.id, nx, ny);
+    done++;
+    if (done % 20 === 0) {
+      // Yield to let WS queue drain and update UI
+      await new Promise(r => setTimeout(r, 10));
+      draw();
+    }
+  }
+
+  // After applying, reset the transform so the background lines up with points at 1:1
+  mapState.background.offsetX = 0;
+  mapState.background.offsetY = 0;
+  mapState.background.scaleX = 1.0;
+  mapState.background.scaleY = 1.0;
+
+  draw();
+  syncBgUI();
+  if (btn) { btn.disabled = false; btn.textContent = `✅ Aplicado (${done} pts)`; }
+  setTimeout(() => {
+    if (btn) btn.textContent = '🎯 Aplicar aos Pontos';
+  }, 3000);
 }
 
 function updateMapZoom(value) {
@@ -444,6 +509,7 @@ window.toggleBgPanel = () => document.getElementById('bg-panel').classList.toggl
 window.uploadBackground = uploadBackground;
 window.clearBackground = clearBackground;
 window.updateBgParam = updateBgParam;
+window.applyTransformToPoints = applyTransformToPoints;
 window.updateMapZoom = updateMapZoom;
 window.setPointType = (type) => {
   const idx = mapState.visual.editSelectedIdx;

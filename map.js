@@ -18,7 +18,9 @@ export const mapState = {
     svgContent: null,
     image: null,    // HTMLImageElement
     offsetX: 0,
-    offsetY: 0
+    offsetY: 0,
+    scaleX: 1.0,
+    scaleY: 1.0,
   },
   // Visual/Transient state (not persisted)
   visual: {
@@ -42,6 +44,8 @@ export function resetMapState() {
   mapState.background.image = null;
   mapState.background.offsetX = 0;
   mapState.background.offsetY = 0;
+  mapState.background.scaleX = 1.0;
+  mapState.background.scaleY = 1.0;
   mapState.visual.hoveredPointId = null;
   mapState.visual.hoveredEdgeId = null;
   mapState.visual.editSelectedIdx = null;
