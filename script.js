@@ -491,6 +491,50 @@ function updateMapZoom(value) {
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
+
+  const bgPanelOpen = document.getElementById('bg-panel')?.classList.contains('open');
+
+  if (bgPanelOpen && e.ctrlKey) {
+    // ── Pinch gesture (Ctrl+scroll on trackpad) → adjust background scale ──
+    // deltaY is small (-1 to -5 for gentle pinch), positive = pinch in (shrink)
+    const sensitivity = 0.008;
+    const factor = 1 - e.deltaY * sensitivity;
+    const newSx = Math.max(0.1, Math.min(5, (mapState.background.scaleX ?? 1) * factor));
+    const newSy = Math.max(0.1, Math.min(5, (mapState.background.scaleY ?? 1) * factor));
+    mapState.background.scaleX = newSx;
+    mapState.background.scaleY = newSy;
+    // Sync sliders + number inputs + labels
+    const sxSlider = document.getElementById('bg-sx');
+    const sySlider = document.getElementById('bg-sy');
+    const sxNum    = document.getElementById('bg-sx-num');
+    const syNum    = document.getElementById('bg-sy-num');
+    const sxVal    = document.getElementById('bg-sx-val');
+    const syVal    = document.getElementById('bg-sy-val');
+    if (sxSlider) sxSlider.value = newSx;
+    if (sySlider) sySlider.value = newSy;
+    if (sxNum)    sxNum.value    = newSx.toFixed(4);
+    if (syNum)    syNum.value    = newSy.toFixed(4);
+    if (sxVal)    sxVal.textContent = newSx.toFixed(3) + '×';
+    if (syVal)    syVal.textContent = newSy.toFixed(3) + '×';
+    draw();
+    return;
+  }
+
+  if (bgPanelOpen && !e.ctrlKey) {
+    // ── Two-finger scroll on trackpad → pan background offset ──
+    // Divide by camera.zoom so speed feels consistent at any zoom level.
+    const zoom = camera.zoom || 1;
+    mapState.background.offsetX -= e.deltaX / zoom;
+    mapState.background.offsetY -= e.deltaY / zoom;
+    const oxInput = document.getElementById('bg-ox');
+    const oyInput = document.getElementById('bg-oy');
+    if (oxInput) oxInput.value = Math.round(mapState.background.offsetX);
+    if (oyInput) oyInput.value = Math.round(mapState.background.offsetY);
+    draw();
+    return;
+  }
+
+  // ── Default: zoom camera ──
   zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.1 : 1 / 1.1);
   const slider = document.getElementById('map-zoom');
   if (slider) slider.value = camera.zoom;
