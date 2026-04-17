@@ -817,16 +817,13 @@ on('floor:sync', (floorData) => {
 // ─── Init ───
 // Nada automático — o usuário cola o token e clica em Conectar.
 
-// ─── Download floor map ───
-window.downloadFloorMap = async function () {
-  const floorId = mapState.floorId;
-  if (!floorId) return;
-
+// ─── Download map ───
+window.downloadMap = async function () {
   const btn = document.getElementById('btn-download-map');
   if (btn) btn.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE}/maps/floor/${floorId}`);
+    const res = await fetch(`${API_BASE}/maps/download`);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.message || `HTTP ${res.status}`);
@@ -835,7 +832,7 @@ window.downloadFloorMap = async function () {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `floor-${floorId}.db`;
+    a.download = `map.db`;
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
