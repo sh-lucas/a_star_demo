@@ -241,6 +241,7 @@ export function syncEstablishmentPanel(est) {
   const nameEl   = document.getElementById('pd-estab-name');
   const descEl   = document.getElementById('pd-estab-desc');
   const hoursEl  = document.getElementById('pd-estab-hours');
+  const catEl    = document.getElementById('pd-estab-category');
   const preview  = document.getElementById('pd-estab-banner-preview');
   const fileEl   = document.getElementById('pd-estab-banner-file');
   const statusEl = document.getElementById('pd-estab-status');
@@ -248,6 +249,7 @@ export function syncEstablishmentPanel(est) {
   if (nameEl)  nameEl.value  = est?.name         || '';
   if (descEl)  descEl.value  = est?.description   || '';
   if (hoursEl) hoursEl.value = est?.opening_hours || '';
+  if (catEl)   catEl.value   = est?.category_id   || '';
 
   // Reset pending file selection
   if (fileEl) fileEl.value = '';

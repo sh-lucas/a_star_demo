@@ -63,6 +63,10 @@ export async function updateFloor(id, name, backgroundSvg) {
     });
 }
 
+export async function listCategories() {
+    return apiFetch('/categories');
+}
+
 // ─── Event emitter ───
 export function on(event, callback) {
     if (!messageHandlers[event]) messageHandlers[event] = [];
@@ -322,13 +326,14 @@ export async function getEstablishment(pointId) {
  * All text fields are optional. Returns null when the server responds 204
  * (no text fields were sent and no establishment exists yet — no-op).
  * @param {number} pointId
- * @param {{ name?: string, description?: string, opening_hours?: string }} fields
+ * @param {{ name?: string, description?: string, opening_hours?: string, category_id?: number }} fields
  */
 export async function upsertEstablishment(pointId, fields) {
     const form = new FormData();
     if (fields.name)          form.append('name',          fields.name);
     if (fields.description)   form.append('description',   fields.description);
     if (fields.opening_hours) form.append('opening_hours', fields.opening_hours);
+    if (fields.category_id)   form.append('category_id',   fields.category_id);
 
     const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
         method: 'PUT',

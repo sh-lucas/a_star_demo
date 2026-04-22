@@ -12,6 +12,7 @@ import {
   getEstablishment, upsertEstablishment, upsertEstablishmentBanner, deleteEstablishment as apiDeleteEstablishment,
   upsertPointMapIcon,
   searchPoints,
+  listCategories,
   on, off,
   remoteCursors,
   API_BASE,
@@ -542,6 +543,7 @@ window.saveEstablishment = async () => {
       name,
       description:   descEl?.value?.trim()  || '',
       opening_hours: hoursEl?.value?.trim() || '',
+      category_id:   parseInt(document.getElementById('pd-estab-category')?.value) || null,
     });
 
     // Upload banner separately if a new file was selected.
@@ -678,7 +680,27 @@ window.connectWithToken = async function() {
   }
   setAuthToken(token);
   await loadFloors();
+  await loadCategories();
 };
+
+async function loadCategories() {
+  const catSelect = document.getElementById('pd-estab-category');
+  if (!catSelect) return;
+
+  try {
+    const cats = await listCategories();
+    // Maintain the "None" option
+    catSelect.innerHTML = '<option value="">(Nenhuma)</option>';
+    cats.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      catSelect.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('[categories] failed to load:', err.message);
+  }
+}
 
 // ─── WebSocket event listeners ───
 on('mouse:position', () => {

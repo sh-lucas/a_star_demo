@@ -610,6 +610,12 @@
         <input type="text" id="pd-estab-hours" placeholder="ex: Seg–Sex 9h–22h"
                oninput="window.markEstabDirty(); return false;">
       </div>
+      <div class="pd-row">
+        <label>Categoria</label>
+        <select id="pd-estab-category" onchange="window.markEstabDirty(); return false;">
+          <option value="">(Nenhuma)</option>
+        </select>
+      </div>
       <div class="pd-row" style="align-items:flex-start;gap:8px;">
         <label style="padding-top:4px;">Banner</label>
         <div style="display:flex;flex-direction:column;gap:4px;flex:1">
