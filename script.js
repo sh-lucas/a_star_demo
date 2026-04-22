@@ -12,7 +12,7 @@ import {
   getEstablishment, upsertEstablishment, upsertEstablishmentBanner, deleteEstablishment as apiDeleteEstablishment,
   upsertPointMapIcon,
   searchPoints,
-  listCategories, createCategory, updateCategory, deleteCategory,
+  listCategories,
   on, off,
   remoteCursors,
   API_BASE,
@@ -689,95 +689,6 @@ window.openFloorSwitcher = function() {
   overlay.style.display = 'flex';
   document.getElementById('floor-conn-status').textContent = 'Selecione um andar';
   loadFloors();
-};
-
-window.openCategoryManager = function() {
-  document.getElementById('category-overlay').style.display = 'flex';
-  renderCategoryList();
-};
-
-window.closeCategoryManager = function() {
-  document.getElementById('category-overlay').style.display = 'none';
-};
-
-let _editingCategoryId = null;
-
-async function renderCategoryList() {
-  const listEl = document.getElementById('category-list');
-  const statusEl = document.getElementById('category-status');
-  listEl.innerHTML = '<div class="list-empty">Carregando...</div>';
-
-  try {
-    const cats = await listCategories();
-    if (!cats.length) {
-      listEl.innerHTML = '<div class="list-empty">Nenhuma categoria encontrada.</div>';
-    } else {
-      listEl.innerHTML = cats.map(c => `
-        <div class="floor-item" style="padding:8px 12px;">
-          <div style="flex:1">
-            <strong>${escapeHtml(c.name)}</strong>
-          </div>
-          <div style="display:flex;gap:4px;">
-            <button onclick="window.editCategory(${c.id}, '${escapeHtml(c.name)}', '${escapeHtml(c.icon_svg)}')" 
-                    style="padding:2px 6px;background:#16213e;color:#fff;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:11px;">E</button>
-            <button onclick="window.deleteCategoryAction(${c.id})" 
-                    style="padding:2px 6px;background:#3a1a1a;color:#e94560;border:1px solid #5a2a2a;border-radius:4px;cursor:pointer;font-size:11px;">X</button>
-          </div>
-        </div>
-      `).join('');
-    }
-  } catch (err) {
-    listEl.innerHTML = `<div class="list-empty" style="color:#e94560">Erro: ${err.message}</div>`;
-  }
-}
-
-window.editCategory = function(id, name, icon) {
-  _editingCategoryId = id;
-  document.getElementById('cat-name-input').value = name;
-  document.getElementById('cat-icon-input').value = icon;
-  document.getElementById('cat-save-btn').textContent = 'Salvar Alterações';
-};
-
-window.saveCategory = async function() {
-  const nameInput = document.getElementById('cat-name-input');
-  const iconInput = document.getElementById('cat-icon-input');
-  const statusEl = document.getElementById('category-status');
-  const name = nameInput.value.trim();
-  const icon = iconInput.value.trim();
-
-  if (!name) {
-    statusEl.textContent = 'Nome é obrigatório';
-    return;
-  }
-
-  statusEl.textContent = 'Salvando...';
-  try {
-    if (_editingCategoryId) {
-      await updateCategory(_editingCategoryId, name, icon);
-    } else {
-      await createCategory(name, icon);
-    }
-    nameInput.value = '';
-    iconInput.value = '';
-    _editingCategoryId = null;
-    document.getElementById('cat-save-btn').textContent = 'Criar Categoria';
-    statusEl.textContent = '✔ Salvo!';
-    renderCategoryList();
-    loadCategories(); // Refresh the main select
-  } catch (err) {
-    statusEl.textContent = `❌ ${err.message}`;
-  }
-};
-
-window.deleteCategoryAction = async function(id) {
-  if (!confirm('Tem certeza que deseja excluir esta categoria?')) return;
-  try {
-    await deleteCategory(id);
-    renderCategoryList();
-    loadCategories();
-  } catch (err) {
-    alert(`Erro ao excluir: ${err.message}`);
-  }
 };
 
 async function loadCategories() {

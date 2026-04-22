@@ -612,13 +612,9 @@
       </div>
       <div class="pd-row">
         <label>Categoria</label>
-        <div style="display:flex;gap:4px;flex:1">
-          <select id="pd-estab-category" onchange="window.markEstabDirty(); return false;" style="flex:1">
-            <option value="">(Nenhuma)</option>
-          </select>
-          <button type="button" onclick="window.openCategoryManager(); return false;" 
-                  style="padding:2px 6px;background:#0f3460;color:#fff;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:12px;">+</button>
-        </div>
+        <select id="pd-estab-category" onchange="window.markEstabDirty(); return false;">
+          <option value="">(Nenhuma)</option>
+        </select>
       </div>
       <div class="pd-row" style="align-items:flex-start;gap:8px;">
         <label style="padding-top:4px;">Banner</label>
@@ -653,35 +649,22 @@
   <!-- Connection status bar -->
   <div id="conn-status"></div>
  
-  <!-- Floor switcher button -->
-  <button type="button" id="btn-floor-switch" title="Mudar de Andar"
-          onclick="window.openFloorSwitcher(); return false;"
-          style="position:fixed;bottom:32px;right:160px;padding:8px 12px;background:#16213e;color:#fff;border:1px solid #444;border-radius:4px;cursor:pointer;font:inherit;font-size:12px;z-index:10;display:none;">
-    🏢 Mudar Andar
-  </button>
-
-  <!-- Download map DB button -->
-  <button type="button" id="btn-download-map" title="Baixar mapa completo (.db)"
-          onclick="window.downloadMap(); return false;" disabled>
-    ⬇️ Baixar mapa (.db)
-  </button>
-
-  <!-- Category Manager Overlay -->
-  <div id="category-overlay" style="display:none;position:fixed;inset:0;background:rgba(10, 10, 30, 0.9);z-index:110;justify-content:center;align-items:center;">
-    <div class="login-box" style="width:480px;">
-      <h2 style="display:flex;justify-content:space-between;align-items:center;">
-        Categorias
-        <button onclick="window.closeCategoryManager()" style="background:transparent;border:none;color:#555;cursor:pointer;font-size:18px;">✕</button>
-      </h2>
-      <div id="category-list" style="max-height:300px;overflow-y:auto;border:1px solid #333;border-radius:4px;margin-bottom:12px;"></div>
-      <div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid #333;padding-top:12px;">
-        <input id="cat-name-input" type="text" placeholder="Nome da Categoria" style="background:#0f172a;color:#fff;border:1px solid #444;border-radius:4px;padding:6px 8px;font:inherit;font-size:12px;">
-        <textarea id="cat-icon-input" placeholder="Ícone SVG (markup)" style="background:#0f172a;color:#fff;border:1px solid #444;border-radius:4px;padding:6px 8px;font:inherit;font-size:12px;min-height:60px;resize:vertical;"></textarea>
-        <button id="cat-save-btn" onclick="window.saveCategory()" style="padding:8px;background:#0f3460;color:#fff;border:1px solid #e94560;border-radius:4px;cursor:pointer;font:inherit;font-size:12px;">Criar Categoria</button>
-      </div>
-      <div id="category-status" style="margin-top:10px;font-size:11px;color:#888;text-align:center;"></div>
-    </div>
+  <div style="position:fixed;bottom:32px;right:12px;display:flex;flex-direction:column;gap:8px;z-index:10;align-items:flex-end;">
+    <!-- Floor switcher button -->
+    <button type="button" id="btn-floor-switch" title="Mudar de Andar"
+            onclick="window.openFloorSwitcher(); return false;"
+            style="padding:8px 12px;background:#16213e;color:#fff;border:1px solid #444;border-radius:4px;cursor:pointer;font:inherit;font-size:12px;display:none;">
+      🏢 Mudar Andar
+    </button>
+ 
+    <!-- Download map DB button -->
+    <button type="button" id="btn-download-map" title="Baixar mapa completo (.db)"
+            onclick="window.downloadMap(); return false;" disabled
+            style="padding:8px 12px;background:#16213e;color:#8bc68a;border:1px solid #3a5a3a;border-radius:4px;cursor:pointer;font:inherit;font-size:12px;">
+      ⬇️ Baixar mapa (.db)
+    </button>
   </div>
+
 
   <script type="module" src="./script.js"></script>
 </body>
