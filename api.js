@@ -67,6 +67,26 @@ export async function listCategories() {
     return apiFetch('/categories');
 }
 
+export async function createCategory(name, iconSvg) {
+    return apiFetch('/categories', {
+        method: 'POST',
+        body: JSON.stringify({ name, icon_svg: iconSvg }),
+    });
+}
+
+export async function updateCategory(id, name, iconSvg) {
+    return apiFetch(`/categories/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, icon_svg: iconSvg }),
+    });
+}
+
+export async function deleteCategory(id) {
+    return apiFetch(`/categories/${id}`, {
+        method: 'DELETE'
+    });
+}
+
 // ─── Event emitter ───
 export function on(event, callback) {
     if (!messageHandlers[event]) messageHandlers[event] = [];
