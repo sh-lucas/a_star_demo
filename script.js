@@ -453,7 +453,6 @@ window.setPointType = (type) => {
   const p = pts[idx];
   if (!p) return;
   p.type = type;
-  if (type === 'path') { delete p.title; delete p.description; delete p.icon; }
   wsUpdatePoint(p.id, type, p.establishment_id ?? null);
   syncPointDetailPanel(idx);
   loadEstablishmentForPoint(p);

@@ -296,7 +296,7 @@ export function syncPointDetailPanel(idx) {
 
   // Mostra/esconde campos de metadados
   const meta = document.getElementById('pd-meta');
-  const hasMeta = type === 'start' || type === 'destination';
+  const hasMeta = type === 'start' || type === 'destination' || type === 'path';
   if (meta) meta.classList.toggle('visible', hasMeta);
 
   if (hasMeta) {
