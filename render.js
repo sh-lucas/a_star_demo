@@ -177,32 +177,32 @@ export function renderLists() {
 
   pl.innerHTML = pts.length
     ? pts.map((p, i) => {
-        const type = p.type || 'path';
-        const dot = `<span class="type-dot ${type}"></span>`;
-        return `<div class="list-item"
+      const type = p.type || 'path';
+      const dot = `<span class="type-dot ${type}"></span>`;
+      return `<div class="list-item"
               onclick="event.preventDefault(); event.stopPropagation(); window.removePoint(${p.id}); return false;"
               onmouseenter="window.setHoveredPoint(${p.id})"
               onmouseleave="window.setHoveredPoint(null)"
               title="Clique para remover">
             ${dot}P${p.id} (${Math.round(p.x)}, ${Math.round(p.y)})
           </div>`;
-      }).join('')
+    }).join('')
     : '<div class="list-empty">nenhum</div>';
 
   el.innerHTML = edges.length
     ? edges.map(e => {
-        const fromP = mapState.points.get(e.from_point_id);
-        const toP = mapState.points.get(e.to_point_id);
-        const fromLabel = fromP ? `P${fromP.id}` : '?';
-        const toLabel = toP ? `P${toP.id}` : '?';
-        return `<div class="list-item"
+      const fromP = mapState.points.get(e.from_point_id);
+      const toP = mapState.points.get(e.to_point_id);
+      const fromLabel = fromP ? `P${fromP.id}` : '?';
+      const toLabel = toP ? `P${toP.id}` : '?';
+      return `<div class="list-item"
               onclick="event.preventDefault(); event.stopPropagation(); window.removeEdge(${e.id}); return false;"
               onmouseenter="window.setHoveredEdge(${e.id})"
               onmouseleave="window.setHoveredEdge(null)"
               title="Clique para remover">
             ${fromLabel} ↔ ${toLabel}
           </div>`;
-      }).join('')
+    }).join('')
     : '<div class="list-empty">nenhuma</div>';
 }
 
@@ -238,18 +238,18 @@ export function syncBgUI() {
  * @param {object|null} est
  */
 export function syncEstablishmentPanel(est) {
-  const nameEl   = document.getElementById('pd-estab-name');
-  const descEl   = document.getElementById('pd-estab-desc');
-  const hoursEl  = document.getElementById('pd-estab-hours');
-  const catEl    = document.getElementById('pd-estab-category');
-  const preview  = document.getElementById('pd-estab-banner-preview');
-  const fileEl   = document.getElementById('pd-estab-banner-file');
+  const nameEl = document.getElementById('pd-estab-name');
+  const descEl = document.getElementById('pd-estab-desc');
+  const hoursEl = document.getElementById('pd-estab-hours');
+  const catEl = document.getElementById('pd-estab-category');
+  const preview = document.getElementById('pd-estab-banner-preview');
+  const fileEl = document.getElementById('pd-estab-banner-file');
   const statusEl = document.getElementById('pd-estab-status');
 
-  if (nameEl)  nameEl.value  = est?.name         || '';
-  if (descEl)  descEl.value  = est?.description   || '';
+  if (nameEl) nameEl.value = est?.name || '';
+  if (descEl) descEl.value = est?.description || '';
   if (hoursEl) hoursEl.value = est?.opening_hours || '';
-  if (catEl)   catEl.value   = est?.category_id   || '';
+  if (catEl) catEl.value = est?.category_id || '';
 
   // Reset pending file selection
   if (fileEl) fileEl.value = '';
@@ -293,6 +293,10 @@ export function syncPointDetailPanel(idx) {
   // Atualiza o seletor de tipo
   const typeSelect = document.getElementById('pd-type');
   if (typeSelect) typeSelect.value = type;
+
+  // Atualiza o seletor de passable_by
+  const passableBySelect = document.getElementById('pd-passable-by');
+  if (passableBySelect) passableBySelect.value = String(p.passable_by ?? 0);
 
   // Mostra/esconde campos de metadados
   const meta = document.getElementById('pd-meta');

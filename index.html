@@ -581,6 +581,14 @@
         <option value="destination">🔴 Destino (destination)</option>
       </select>
     </div>
+    <div class="pd-row">
+      <label>Acesso</label>
+      <select id="pd-passable-by" onchange="window.setPassableBy(parseInt(this.value)); return false;">
+        <option value="0">♿🚶 Todos</option>
+        <option value="-1">♿ Apenas PCD</option>
+        <option value="1">🚶 Apenas sem deficiência</option>
+      </select>
+    </div>
      <div class="pd-meta" id="pd-meta">
       <div class="pd-row" style="align-items:flex-start;gap:8px;">
         <label style="padding-top:4px;">Ícone</label>

@@ -286,8 +286,8 @@ export function wsMovePoint(id, x, y) {
     send('point:move', { id, x, y });
 }
 
-export function wsUpdatePoint(id, type, establishmentId = null) {
-    send('point:update', { id, type, establishment_id: establishmentId });
+export function wsUpdatePoint(id, type, establishmentId = null, passableBy = 0) {
+    send('point:update', { id, type, establishment_id: establishmentId, passable_by: passableBy });
 }
 
 export function wsRemovePoint(id) {
@@ -330,10 +330,10 @@ export async function getEstablishment(pointId) {
  */
 export async function upsertEstablishment(pointId, fields) {
     const form = new FormData();
-    if (fields.name)          form.append('name',          fields.name);
-    if (fields.description)   form.append('description',   fields.description);
+    if (fields.name) form.append('name', fields.name);
+    if (fields.description) form.append('description', fields.description);
     if (fields.opening_hours) form.append('opening_hours', fields.opening_hours);
-    if (fields.category_id)   form.append('category_id',   fields.category_id);
+    if (fields.category_id) form.append('category_id', fields.category_id);
 
     const res = await fetch(`${API_BASE}/points/${pointId}/establishment`, {
         method: 'PUT',
@@ -414,10 +414,10 @@ export async function upsertPointMapIcon(pointId, iconFile) {
  */
 export async function searchPoints(q, opts = {}) {
     const params = new URLSearchParams({ q });
-    if (opts.floor_id)    params.set('floor_id',    opts.floor_id);
+    if (opts.floor_id) params.set('floor_id', opts.floor_id);
     if (opts.category_id) params.set('category_id', opts.category_id);
-    if (opts.limit)       params.set('limit',        opts.limit);
-    if (opts.offset)      params.set('offset',       opts.offset);
+    if (opts.limit) params.set('limit', opts.limit);
+    if (opts.offset) params.set('offset', opts.offset);
     return apiFetch(`/search?${params}`);
 }
 

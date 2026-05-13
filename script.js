@@ -256,7 +256,7 @@ function stopMouseHeartbeat() {
 
 // ─── Search overlay ───
 const searchOverlay = document.getElementById('search-overlay');
-const searchInput   = document.getElementById('search-input');
+const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 
 let searchDebounceTimer = null;
@@ -277,7 +277,7 @@ function closeSearch() {
 function centerOnPoint(point) {
   const canvas = document.getElementById('canvas');
   // Pan the camera so the point sits at the center of the canvas.
-  camera.x = canvas.width  / 2 - point.x * camera.zoom;
+  camera.x = canvas.width / 2 - point.x * camera.zoom;
   camera.y = canvas.height / 2 - point.y * camera.zoom;
   closeSearch();
   draw();
@@ -313,7 +313,7 @@ async function runSearch(q) {
 }
 
 function escapeHtml(str) {
-  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 searchInput.addEventListener('input', () => {
@@ -453,11 +453,20 @@ window.setPointType = (type) => {
   const p = pts[idx];
   if (!p) return;
   p.type = type;
-  wsUpdatePoint(p.id, type, p.establishment_id ?? null);
+  wsUpdatePoint(p.id, type, p.establishment_id ?? null, p.passable_by ?? 0);
   syncPointDetailPanel(idx);
   loadEstablishmentForPoint(p);
   renderLists();
   draw();
+};
+window.setPassableBy = (value) => {
+  const idx = mapState.visual.editSelectedIdx;
+  if (idx === null || idx === undefined) return;
+  const pts = getPointsArray();
+  const p = pts[idx];
+  if (!p) return;
+  p.passable_by = value;
+  wsUpdatePoint(p.id, p.type, p.establishment_id ?? null, value);
 };
 window.setPointMeta = (field, value) => {
   const idx = mapState.visual.editSelectedIdx;
@@ -525,11 +534,11 @@ window.saveEstablishment = async () => {
   const p = pts[idx];
   if (!p || p.type !== 'destination') return;
 
-  const nameEl   = document.getElementById('pd-estab-name');
-  const descEl   = document.getElementById('pd-estab-desc');
-  const hoursEl  = document.getElementById('pd-estab-hours');
+  const nameEl = document.getElementById('pd-estab-name');
+  const descEl = document.getElementById('pd-estab-desc');
+  const hoursEl = document.getElementById('pd-estab-hours');
   const statusEl = document.getElementById('pd-estab-status');
-  const saveBtn  = document.getElementById('pd-estab-save');
+  const saveBtn = document.getElementById('pd-estab-save');
 
   const name = nameEl?.value?.trim() || '';
 
@@ -540,9 +549,9 @@ window.saveEstablishment = async () => {
     // Upsert text fields (all optional on the backend now).
     let est = await upsertEstablishment(p.id, {
       name,
-      description:   descEl?.value?.trim()  || '',
+      description: descEl?.value?.trim() || '',
       opening_hours: hoursEl?.value?.trim() || '',
-      category_id:   parseInt(document.getElementById('pd-estab-category')?.value) || null,
+      category_id: parseInt(document.getElementById('pd-estab-category')?.value) || null,
     });
 
     // Upload banner separately if a new file was selected.
@@ -671,7 +680,7 @@ async function selectFloor(id) {
 window.selectFloor = selectFloor;
 
 // Chamado pelo botão "Conectar" no overlay — lê o token do input e lista os floors
-window.connectWithToken = async function() {
+window.connectWithToken = async function () {
   const input = document.getElementById('token-input');
   const token = input ? input.value.trim() : '';
   if (!token) {
@@ -683,7 +692,7 @@ window.connectWithToken = async function() {
   await loadCategories();
 };
 
-window.openFloorSwitcher = function() {
+window.openFloorSwitcher = function () {
   const overlay = document.getElementById('login-overlay');
   overlay.style.display = 'flex';
   document.getElementById('floor-conn-status').textContent = 'Selecione um andar';
