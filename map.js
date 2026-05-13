@@ -128,7 +128,8 @@ export function loadFloorData(floorData) {
         establishment_id: p.establishment_id,
         map_icon_type: p.map_icon_type ?? null,
         map_icon_data: p.map_icon_data ?? null,
-        floor_id: p.floor_id
+        floor_id: p.floor_id,
+        passable_by: p.passable_by ?? 0,
       });
     }
   }

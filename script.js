@@ -467,6 +467,8 @@ window.setPassableBy = (value) => {
   if (!p) return;
   p.passable_by = value;
   wsUpdatePoint(p.id, p.type, p.establishment_id ?? null, value);
+  syncPointDetailPanel(idx);
+  draw();
 };
 window.setPointMeta = (field, value) => {
   const idx = mapState.visual.editSelectedIdx;
@@ -735,7 +737,8 @@ on('point:added', (payload) => {
     establishment_id: payload.establishment_id,
     map_icon_type: payload.map_icon_type ?? null,
     map_icon_data: payload.map_icon_data ?? null,
-    floor_id: payload.floor_id
+    floor_id: payload.floor_id,
+    passable_by: payload.passable_by ?? 0,
   });
   console.log('[point:added] before renderLists');
   renderLists();
@@ -761,6 +764,7 @@ on('point:updated', (payload) => {
     p.establishment_id = payload.establishment_id;
     p.map_icon_type = payload.map_icon_type ?? null;
     p.map_icon_data = payload.map_icon_data ?? null;
+    p.passable_by = payload.passable_by ?? 0;
   }
   renderLists();
   draw();
