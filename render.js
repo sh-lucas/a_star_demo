@@ -1,6 +1,6 @@
 import { camera, prepareCanvas, finishCanvas, worldToScreen } from './camera.js';
 import { mapState, getPointsArray, getEdgesArray, loadMapIconToImage } from './map.js';
-import { remoteCursors } from './api.js';
+import { remoteCursors, API_BASE } from './api.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -254,15 +254,16 @@ export function syncEstablishmentPanel(est) {
   // Reset pending file selection
   if (fileEl) fileEl.value = '';
 
-  // Show/hide banner preview from banner_data (base64-encoded WebP)
+  // Show/hide banner preview from banner_url (raw WebP served async by the API)
   if (preview) {
     // Revoke any existing blob URL to prevent memory leak.
     if (preview.src && preview.src.startsWith('blob:')) {
       URL.revokeObjectURL(preview.src);
     }
 
-    if (est?.banner_data) {
-      preview.src = `data:image/webp;base64,${est.banner_data}`;
+    if (est?.banner_url) {
+      // Use the full API URL so the browser loads the WebP asynchronously.
+      preview.src = `${API_BASE}${est.banner_url}`;
       preview.classList.add('visible');
     } else {
       preview.src = '';
