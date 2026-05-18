@@ -509,6 +509,8 @@ window.onPointIconChange = async (input) => {
 
 // Track a pending icon File selected by the user (not yet saved).
 let _pendingBannerFile = null;
+// Track the current blob URL for the banner preview so we can revoke it.
+let _bannerPreviewBlobUrl = null;
 // True while the user has unsaved edits in the establishment fields.
 // Prevents background reloads (floor:sync) from wiping what they typed.
 let _establishmentDirty = false;
@@ -516,11 +518,19 @@ let _establishmentDirty = false;
 window.onEstabBannerChange = (input) => {
   _pendingBannerFile = input.files[0] || null;
   _establishmentDirty = true;
+
+  // Revoke previous blob URL to prevent memory leak.
+  if (_bannerPreviewBlobUrl) {
+    URL.revokeObjectURL(_bannerPreviewBlobUrl);
+    _bannerPreviewBlobUrl = null;
+  }
+
   // Show a local preview immediately.
   if (_pendingBannerFile) {
     const preview = document.getElementById('pd-estab-banner-preview');
     if (preview) {
-      preview.src = URL.createObjectURL(_pendingBannerFile);
+      _bannerPreviewBlobUrl = URL.createObjectURL(_pendingBannerFile);
+      preview.src = _bannerPreviewBlobUrl;
       preview.classList.add('visible');
     }
   }
@@ -565,6 +575,13 @@ window.saveEstablishment = async () => {
     if (est?.id) p.establishment_id = est.id;
     _pendingBannerFile = null;
     _establishmentDirty = false;
+
+    // Revoke blob URL — we no longer need the local preview.
+    if (_bannerPreviewBlobUrl) {
+      URL.revokeObjectURL(_bannerPreviewBlobUrl);
+      _bannerPreviewBlobUrl = null;
+    }
+
     // Refresh the file input + preview from the saved data.
     syncEstablishmentPanel(est);
     if (statusEl) statusEl.textContent = '✔ Salvo!';
@@ -589,7 +606,11 @@ window.deleteEstablishment = async () => {
   try {
     await apiDeleteEstablishment(p.id);
     p.establishment_id = null;
-    _pendingIconFile = null;
+
+    if (_bannerPreviewBlobUrl) {
+      URL.revokeObjectURL(_bannerPreviewBlobUrl);
+      _bannerPreviewBlobUrl = null;
+    }
     _pendingBannerFile = null;
     _establishmentDirty = false;
     syncEstablishmentPanel(null);
@@ -612,6 +633,13 @@ async function loadEstablishmentForPoint(p) {
   if (_establishmentDirty) return;
 
   _pendingBannerFile = null;
+
+  // Revoke blob URL before clearing — we'll get fresh data from the server.
+  if (_bannerPreviewBlobUrl) {
+    URL.revokeObjectURL(_bannerPreviewBlobUrl);
+    _bannerPreviewBlobUrl = null;
+  }
+
   // Optimistically clear while loading.
   syncEstablishmentPanel(null);
   try {

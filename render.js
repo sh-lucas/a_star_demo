@@ -256,6 +256,11 @@ export function syncEstablishmentPanel(est) {
 
   // Show/hide banner preview from banner_data (base64-encoded WebP)
   if (preview) {
+    // Revoke any existing blob URL to prevent memory leak.
+    if (preview.src && preview.src.startsWith('blob:')) {
+      URL.revokeObjectURL(preview.src);
+    }
+
     if (est?.banner_data) {
       preview.src = `data:image/webp;base64,${est.banner_data}`;
       preview.classList.add('visible');
