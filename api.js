@@ -1,5 +1,3 @@
-import { API_BASE } from './consts.js';
-
 export let AUTH_TOKEN = "";
 
 export function setAuthToken(token) {
