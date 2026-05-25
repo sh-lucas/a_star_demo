@@ -1,3 +1,5 @@
+import { API_BASE } from './consts.js';
+
 export let AUTH_TOKEN = "";
 
 export function setAuthToken(token) {
@@ -442,5 +444,3 @@ export async function searchPoints(q, opts = {}) {
     if (opts.offset) params.set("offset", opts.offset);
     return apiFetch(`/search?${params}`);
 }
-
-export { API_BASE };

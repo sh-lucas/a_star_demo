@@ -15,8 +15,8 @@ import {
   listCategories,
   on, off,
   remoteCursors,
-  API_BASE,
 } from './api.js';
+import { API_BASE } from './consts.js';
 
 
 const TOOLS = {

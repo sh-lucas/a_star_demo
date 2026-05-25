@@ -1,6 +1,7 @@
 import { camera, prepareCanvas, finishCanvas, worldToScreen } from './camera.js';
 import { mapState, getPointsArray, getEdgesArray, loadMapIconToImage } from './map.js';
-import { remoteCursors, API_BASE } from './api.js';
+import { remoteCursors } from './api.js';
+import { API_BASE } from './consts.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
