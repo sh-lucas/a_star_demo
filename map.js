@@ -14,6 +14,8 @@ export const mapState = {
   points: new Map(),
   // Edges keyed by DB id: Map<id, { id, from_point_id, to_point_id, group_id }>
   edges: new Map(),
+  // Grupos de arestas keyed by DB id: Map<id, { id, display_name }> — carregado uma vez no boot
+  edgeGroups: new Map(),
   background: {
     svgContent: null,
     image: null,    // HTMLImageElement
@@ -25,7 +27,10 @@ export const mapState = {
     hoveredPointId: null,
     hoveredEdgeId: null,
     editSelectedIdx: null,   // array index for editing
-    selected: []             // pending point DB IDs for edge/path
+    selected: [],            // pending point DB IDs for edge/path
+    selectedEdgeIds: new Set(), // persistent multi-selection of edge DB IDs (modo "Grupo de Aresta")
+    activeEdgeGroupId: null,  // grupo alvo para o botão "Atribuir grupo"
+    editingEdgeGroupId: null  // grupo com campo de nome aberto pra edição na lista
   },
   session: {
     pathResult: [] // array of point DB IDs forming the A* path
@@ -46,6 +51,7 @@ export function resetMapState() {
   mapState.visual.hoveredEdgeId = null;
   mapState.visual.editSelectedIdx = null;
   mapState.visual.selected = [];
+  mapState.visual.selectedEdgeIds.clear();
   mapState.session.pathResult = [];
   mapState.floorId = null;
   mapState.floorName = null;

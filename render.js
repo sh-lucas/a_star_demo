@@ -1,7 +1,7 @@
 import { camera, prepareCanvas, finishCanvas, worldToScreen } from './camera.js';
 import { mapState, getPointsArray, getEdgesArray, loadMapIconToImage } from './map.js';
 import { remoteCursors } from './api.js';
-import { API_BASE } from './consts.js';
+import { API_BASE, EDGE_GROUP_COLORS } from './consts.js';
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -86,6 +86,7 @@ export function draw() {
 
     const isPath = pathEdges.has([e.from_point_id, e.to_point_id].sort().join('-'));
     const isHovered = e.id === mapState.visual.hoveredEdgeId;
+    const isSelectedForGroup = mapState.visual.selectedEdgeIds.has(e.id);
 
     ctx.beginPath();
     ctx.moveTo(pa.x, pa.y);
@@ -94,9 +95,18 @@ export function draw() {
     if (isHovered) {
       ctx.strokeStyle = '#ffcc00';
       ctx.lineWidth = 4;
+    } else if (isSelectedForGroup) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+    } else if (isPath) {
+      ctx.strokeStyle = '#e94560';
+      ctx.lineWidth = 3;
+    } else if (e.group_id != null) {
+      ctx.strokeStyle = EDGE_GROUP_COLORS[e.group_id % EDGE_GROUP_COLORS.length];
+      ctx.lineWidth = 2;
     } else {
-      ctx.strokeStyle = isPath ? '#e94560' : '#555';
-      ctx.lineWidth = isPath ? 3 : 1.5;
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 1.5;
     }
     ctx.stroke();
   }
@@ -196,15 +206,59 @@ export function renderLists() {
       const toP = mapState.points.get(e.to_point_id);
       const fromLabel = fromP ? `P${fromP.id}` : '?';
       const toLabel = toP ? `P${toP.id}` : '?';
-      return `<div class="list-item"
-              onclick="event.preventDefault(); event.stopPropagation(); window.removeEdge(${e.id}); return false;"
+      const group = e.group_id != null ? mapState.edgeGroups.get(e.group_id) : null;
+      const groupSuffix = group ? ` — ${group.display_name}` : '';
+      const isSelected = mapState.visual.selectedEdgeIds.has(e.id);
+      return `<div class="list-item${isSelected ? ' selected' : ''}"
+              onclick="event.preventDefault(); event.stopPropagation(); window.onEdgeListClick(${e.id}); return false;"
               onmouseenter="window.setHoveredEdge(${e.id})"
               onmouseleave="window.setHoveredEdge(null)"
-              title="Clique para remover">
-            ${fromLabel} ↔ ${toLabel}
+              title="Clique para remover/selecionar">
+            ${fromLabel} ↔ ${toLabel}${groupSuffix}
           </div>`;
     }).join('')
     : '<div class="list-empty">nenhuma</div>';
+}
+
+/**
+ * Sincroniza o painel de atribuição de grupo de aresta (#edge-group-detail).
+ * @param {boolean} visible
+ */
+export function syncEdgeGroupPanel(visible) {
+  const panel = document.getElementById('edge-group-detail');
+  if (!panel) return;
+  panel.classList.toggle('visible', !!visible);
+  if (!visible) return;
+
+  const count = mapState.visual.selectedEdgeIds.size;
+  const countEl = document.getElementById('eg-count');
+  if (countEl) {
+    countEl.textContent = `${count} aresta${count === 1 ? '' : 's'} selecionada${count === 1 ? '' : 's'}`;
+  }
+
+  const list = document.getElementById('edge-group-list');
+  if (!list) return;
+
+  const groups = Array.from(mapState.edgeGroups.values());
+  const editingId = mapState.visual.editingEdgeGroupId;
+  const activeId = mapState.visual.activeEdgeGroupId;
+
+  list.innerHTML = groups.length
+    ? groups.map(g => {
+      if (g.id === editingId) {
+        return `<input type="text" value="${g.display_name.replace(/"/g, '&quot;')}"
+              autofocus
+              onblur="window.commitEdgeGroupRename(${g.id}, this.value); return false;"
+              onkeydown="if (event.key === 'Enter') this.blur(); if (event.key === 'Escape') { window.cancelEdgeGroupRename(); }" />`;
+      }
+      const isActive = g.id === activeId;
+      return `<div class="list-item${isActive ? ' selected' : ''}"
+              onclick="event.preventDefault(); event.stopPropagation(); window.selectEdgeGroupForEditing(${g.id}); return false;"
+              title="Clique para selecionar/renomear">
+            🏷️ ${g.display_name}
+          </div>`;
+    }).join('')
+    : '<div class="list-empty">nenhum grupo ainda</div>';
 }
 
 export function syncBgUI() {

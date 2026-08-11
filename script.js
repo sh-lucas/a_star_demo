@@ -1,13 +1,14 @@
 import { camera, screenToWorld, pan, zoomAt, setZoom, handleResize } from './camera.js';
 import { runAStar } from './star.js';
 import { mapState, getPointsArray, getEdgesArray, findPointIndexById, getPointById, loadFloorData, loadSvgToImage, snapToGrid, GRID_SIZE } from './map.js';
-import { draw, renderLists, syncBgUI, syncPointDetailPanel, syncEstablishmentPanel, notifyCursorUpdate } from './render.js';
+import { draw, renderLists, syncBgUI, syncPointDetailPanel, syncEstablishmentPanel, syncEdgeGroupPanel, notifyCursorUpdate } from './render.js';
 import {
   setAuthToken,
   listFloors, getFloor, updateFloor,
   connect, disconnect, isConnected,
   wsAddPoint, wsMovePoint, wsUpdatePoint, wsRemovePoint,
   wsAddEdge, wsRemoveEdge,
+  wsUpdateEdgeGroup, listEdgeGroups, createEdgeGroup, renameEdgeGroup,
   sendMousePosition,
   getEstablishment, upsertEstablishment, upsertEstablishmentBanner, deleteEstablishment as apiDeleteEstablishment,
   upsertPointMapIcon,
@@ -17,6 +18,7 @@ import {
   remoteCursors,
 } from './api.js';
 import { API_BASE } from './consts.js';
+import { findStoreRegionAtPoint, getStoreRegionCenter, flashStoreRegion } from './svg-regions.js';
 
 
 const TOOLS = {
@@ -24,7 +26,9 @@ const TOOLS = {
   point: { label: 'Adicionar Ponto', cursor: 'crosshair', activeCursor: 'crosshair' },
   edge: { label: 'Adicionar Aresta (clique em 2 pontos)', cursor: 'crosshair', activeCursor: 'crosshair' },
   path: { label: 'Achar Caminho (clique em 2 pontos)', cursor: 'crosshair', activeCursor: 'crosshair' },
-  edit: { label: 'Editar Ponto (clique/arraste)', cursor: 'default', activeCursor: 'move' }
+  edit: { label: 'Editar Ponto (clique/arraste)', cursor: 'default', activeCursor: 'move' },
+  center: { label: 'Centralizar na Loja (clique no ponto)', cursor: 'pointer', activeCursor: 'pointer' },
+  'edge-group': { label: 'Grupo de Aresta (clique em 2 pontos por aresta)', cursor: 'crosshair', activeCursor: 'crosshair' },
 };
 
 let mode = 'move';
@@ -39,7 +43,7 @@ let mouseOnCanvas = false; // true while the pointer is inside the canvas
 const canvas = document.getElementById('canvas');
 
 function updateCursor() {
-  const tool = spaceDown ? TOOLS['move'] : TOOLS[mode];
+  const tool = spaceDown ? TOOLS.move : (TOOLS[mode] ?? TOOLS.move);
   canvas.style.cursor = (panning || spaceDown) ? tool.activeCursor : tool.cursor;
 }
 
@@ -187,6 +191,11 @@ canvas.addEventListener('click', e => {
   }
 
   const idx = nearestPoint(x, y, 20);
+  if (mode === 'center') {
+    if (idx === null) return false;
+    centerPointInStore(getPointsArray()[idx]);
+    return false;
+  }
   if (mode === 'edit') {
     mapState.visual.editSelectedIdx = idx;
     syncPointDetailPanel(idx);
@@ -208,6 +217,20 @@ canvas.addEventListener('click', e => {
     mapState.visual.selected = [];
     if (mode === 'edge') {
       if (a !== b) wsAddEdge(a, b);
+    } else if (mode === 'edge-group') {
+      const path = runAStar(mapState.points, mapState.edges, a, b);
+      mapState.session.pathResult = path;
+      if (path.length < 2) {
+        alert('Nenhum caminho encontrado entre esses dois pontos.');
+      } else {
+        for (let i = 0; i < path.length - 1; i++) {
+          const edge = findEdgeBetween(path[i], path[i + 1]);
+          if (edge) mapState.visual.selectedEdgeIds.add(edge.id);
+        }
+        renderLists();
+        syncEdgeGroupPanel(true);
+      }
+      draw();
     } else {
       mapState.session.pathResult = runAStar(mapState.points, mapState.edges, a, b);
       if (mapState.session.pathResult.length === 0 && a !== b) alert('Nenhum caminho encontrado!');
@@ -218,6 +241,15 @@ canvas.addEventListener('click', e => {
   }
   return false;
 });
+
+function findEdgeBetween(a, b) {
+  for (const e of getEdgesArray()) {
+    if ((e.from_point_id === a && e.to_point_id === b) || (e.from_point_id === b && e.to_point_id === a)) {
+      return e;
+    }
+  }
+  return null;
+}
 
 // ─── Mouse position send — dispara direto no mousemove, throttled a ~12x/s ───
 let mouseLastSendTime = 0;
@@ -336,20 +368,30 @@ searchOverlay.addEventListener('mousedown', e => {
 
 // ─── Mode ───
 function setMode(m) {
+  if (!TOOLS[m]) {
+    console.warn('[setMode] ferramenta desconhecida:', m);
+    return;
+  }
   mode = m;
   if (m !== 'move') prevMode = m;
   mapState.visual.selected = [];
+  mapState.visual.selectedEdgeIds.clear();
   mapState.session.pathResult = [];
   if (m !== 'edit') {
     mapState.visual.editSelectedIdx = null;
     syncPointDetailPanel(null);
   }
+  if (m !== 'edge-group') {
+    mapState.visual.editingEdgeGroupId = null;
+  }
+  syncEdgeGroupPanel(m === 'edge-group');
 
   document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   const btn = document.getElementById('btn-' + m);
   if (btn) btn.classList.add('active');
 
   updateCursor();
+  renderLists();
   draw();
 }
 
@@ -361,6 +403,33 @@ function nearestPoint(wx, wy, radius) {
     if (d < bestD) { bestD = d; best = i; }
   }
   return best;
+}
+
+function centerPointInStore(point) {
+  const svg = document.querySelector('#bg-layer svg');
+  if (!svg) {
+    alert('Carregue o SVG de fundo antes de centralizar um ponto.');
+    return;
+  }
+
+  const region = findStoreRegionAtPoint(svg, point);
+  if (!region) {
+    alert(`O ponto P${point.id} não está dentro de uma região de loja reconhecida.`);
+    return;
+  }
+
+  const center = getStoreRegionCenter(region);
+  if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) {
+    alert(`Não foi possível calcular o centro da região para P${point.id}.`);
+    return;
+  }
+
+  point.x = snapToGrid(center.x);
+  point.y = snapToGrid(center.y);
+  flashStoreRegion(region);
+  wsMovePoint(point.id, point.x, point.y);
+  renderLists();
+  draw();
 }
 
 // ─── Background ───
@@ -439,6 +508,62 @@ canvas.addEventListener('wheel', e => {
 window.setMode = setMode;
 window.removePoint = (pid) => { wsRemovePoint(pid); };
 window.removeEdge = (eid) => { wsRemoveEdge(eid); };
+window.onEdgeListClick = (eid) => {
+  if (mode === 'edge-group') {
+    if (mapState.visual.selectedEdgeIds.has(eid)) mapState.visual.selectedEdgeIds.delete(eid);
+    else mapState.visual.selectedEdgeIds.add(eid);
+    renderLists();
+    syncEdgeGroupPanel(true);
+    draw();
+  } else {
+    wsRemoveEdge(eid);
+  }
+};
+window.createNewEdgeGroup = async () => {
+  try {
+    const group = await createEdgeGroup('Grupo Novo');
+    mapState.edgeGroups.set(group.id, group);
+    mapState.visual.activeEdgeGroupId = group.id;
+    mapState.visual.editingEdgeGroupId = group.id; // já abre o campo de nome pra editar
+    syncEdgeGroupPanel(true);
+  } catch (err) {
+    alert(`Erro ao criar grupo: ${err.message}`);
+  }
+};
+window.selectEdgeGroupForEditing = (id) => {
+  mapState.visual.activeEdgeGroupId = id;
+  mapState.visual.editingEdgeGroupId = id;
+  syncEdgeGroupPanel(true);
+};
+window.cancelEdgeGroupRename = () => {
+  mapState.visual.editingEdgeGroupId = null;
+  syncEdgeGroupPanel(true);
+};
+window.commitEdgeGroupRename = async (id, value) => {
+  mapState.visual.editingEdgeGroupId = null;
+  const name = (value || '').trim();
+  const current = mapState.edgeGroups.get(id);
+  if (!name || !current || name === current.display_name) {
+    syncEdgeGroupPanel(true);
+    return;
+  }
+  try {
+    const group = await renameEdgeGroup(id, name);
+    mapState.edgeGroups.set(group.id, group);
+  } catch (err) {
+    alert(`Erro ao renomear grupo: ${err.message}`);
+  }
+  syncEdgeGroupPanel(true);
+};
+window.assignEdgeGroup = () => {
+  const groupId = mapState.visual.activeEdgeGroupId;
+  if (!groupId || mapState.visual.selectedEdgeIds.size === 0) return;
+  wsUpdateEdgeGroup([...mapState.visual.selectedEdgeIds], groupId);
+};
+window.removeEdgeGroupAssignment = () => {
+  if (mapState.visual.selectedEdgeIds.size === 0) return;
+  wsUpdateEdgeGroup([...mapState.visual.selectedEdgeIds], null);
+};
 window.setHoveredPoint = (id) => { mapState.visual.hoveredPointId = id; draw(); };
 window.setHoveredEdge = (id) => { mapState.visual.hoveredEdgeId = id; draw(); };
 window.toggleBgPanel = () => document.getElementById('bg-panel').classList.toggle('open');
@@ -720,6 +845,7 @@ window.connectWithToken = async function () {
   setAuthToken(token);
   await loadFloors();
   await loadCategories();
+  await loadEdgeGroups();
 };
 
 window.openFloorSwitcher = function () {
@@ -745,6 +871,16 @@ async function loadCategories() {
     });
   } catch (err) {
     console.error('[categories] failed to load:', err.message);
+  }
+}
+
+async function loadEdgeGroups() {
+  try {
+    const groups = await listEdgeGroups();
+    mapState.edgeGroups.clear();
+    (groups || []).forEach(g => mapState.edgeGroups.set(g.id, g));
+  } catch (err) {
+    console.error('[edgeGroups] failed to load:', err.message);
   }
 }
 
@@ -825,6 +961,15 @@ on('edge:added', (payload) => {
     to_point_id: payload.to_point_id,
     group_id: payload.group_id
   });
+  renderLists();
+  draw();
+});
+
+on('edge:updated', (payload) => {
+  const e = mapState.edges.get(payload.id);
+  if (e) {
+    e.group_id = payload.group_id;
+  }
   renderLists();
   draw();
 });

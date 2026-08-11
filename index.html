@@ -124,6 +124,7 @@
       text-overflow: ellipsis;
     }
     .list-item:hover { background: #0f3460; color: #e94560; }
+    .list-item.selected { background: #0f3460; color: #f0a500; box-shadow: inset 3px 0 0 #f0a500; }
     .list-empty {
       padding: 5px 8px;
       font-size: 11px;
@@ -343,6 +344,69 @@
     .type-dot.start { background: #66bb6a; }
     .type-dot.destination { background: #e94560; }
 
+    /* ---- Edge Group Detail Panel ---- */
+    #edge-group-detail {
+      display: none;
+      position: fixed;
+      bottom: 48px;
+      left: 12px;
+      width: 340px;
+      max-height: 85vh;
+      overflow-y: auto;
+      background: #16213e;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 10px;
+      z-index: 10;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #edge-group-detail.visible { display: flex; }
+    #edge-group-detail .pd-title {
+      font-size: 11px;
+      color: #888;
+      border-bottom: 1px solid #333;
+      padding-bottom: 6px;
+      margin-bottom: 2px;
+    }
+    #edge-group-detail .pd-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #edge-group-detail select {
+      flex: 1;
+      background: #0f172a;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font: inherit;
+      font-size: 12px;
+    }
+    #edge-group-detail select:focus { border-color: #e94560; outline: none; }
+    #edge-group-list {
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 4px;
+    }
+    #edge-group-list .list-item { font-size: 12px; }
+    #edge-group-list input[type="text"] {
+      width: 100%;
+      background: #0f172a;
+      color: #fff;
+      border: 1px solid #e94560;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font: inherit;
+      font-size: 12px;
+    }
+
     /* ---- Search overlay ---- */
     #search-overlay {
       display: none;
@@ -535,7 +599,9 @@
     <button type="button" class="mode-btn" id="btn-point" onclick="window.setMode('point'); return false;">➕ Adicionar Ponto</button>
     <button type="button" class="mode-btn" id="btn-edge" onclick="window.setMode('edge'); return false;">🔗 Adicionar Aresta</button>
     <button type="button" class="mode-btn" id="btn-edit" onclick="window.setMode('edit'); return false;">✏️ Editar Ponto</button>
+    <button type="button" class="mode-btn" id="btn-center" onclick="window.setMode('center'); return false;">🎯 Centralizar na Loja</button>
     <button type="button" class="mode-btn" id="btn-path" onclick="window.setMode('path'); return false;">🔍 Achar Caminho</button>
+    <button type="button" class="mode-btn" id="btn-edge-group" onclick="window.setMode('edge-group'); return false;">🏷️ Grupo de Aresta</button>
 
     <div class="list-section">
       <div class="list-title">Pontos</div>
@@ -639,6 +705,18 @@
                 onclick="window.deleteEstablishment(); return false;">🗑</button>
       </div>
       <div id="pd-estab-status" style="font-size:10px;color:#888;text-align:center;min-height:14px;"></div>
+    </div>
+  </div>
+
+  <!-- Edge Group Detail Panel (aparece em modo "Grupo de Aresta") -->
+  <div id="edge-group-detail">
+    <div class="pd-title">Grupo de Aresta</div>
+    <div class="pd-row"><span id="eg-count">0 arestas selecionadas</span></div>
+    <button type="button" class="pd-save-btn" onclick="window.createNewEdgeGroup(); return false;">+ Criar novo grupo</button>
+    <div id="edge-group-list"></div>
+    <div class="pd-estab-actions">
+      <button type="button" class="pd-save-btn" onclick="window.assignEdgeGroup(); return false;">🏷️ Atribuir grupo selecionado</button>
+      <button type="button" class="pd-del-btn" onclick="window.removeEdgeGroupAssignment(); return false;">🗑 Remover grupo</button>
     </div>
   </div>
 

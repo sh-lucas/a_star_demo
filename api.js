@@ -65,6 +65,24 @@ export async function listCategories() {
     return apiFetch("/admin/categories");
 }
 
+export async function listEdgeGroups() {
+    return apiFetch("/admin/edge-groups");
+}
+
+export async function createEdgeGroup(displayName) {
+    return apiFetch("/admin/edge-groups", {
+        method: "POST",
+        body: JSON.stringify({ display_name: displayName }),
+    });
+}
+
+export async function renameEdgeGroup(id, displayName) {
+    return apiFetch(`/admin/edge-groups/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ display_name: displayName }),
+    });
+}
+
 // ─── Event emitter ───
 export function on(event, callback) {
     if (!messageHandlers[event]) messageHandlers[event] = [];
@@ -320,6 +338,13 @@ export function wsAddEdge(fromPointId, toPointId, groupId = null) {
 
 export function wsRemoveEdge(id) {
     send("edge:remove", { id });
+}
+
+// edgeIds: array of edge DB ids; groupId: number | null
+export function wsUpdateEdgeGroup(edgeIds, groupId) {
+    edgeIds.forEach((id) => {
+        send("edge:update_group", { id, group_id: groupId });
+    });
 }
 
 // x and y can be numbers (world coords) or null to hide this client's cursor.
